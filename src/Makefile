@@ -15,7 +15,9 @@ adt_SRC = adt.c callback.c repaint.c event.c ut.c eca.c menu.c pix.c browserHelp
 xintolat_SRC = xintolat.c
 
 
-CFLAGS += -I$(EPICS_BASE)/include  -I$(SDDS_REPO)/include -I$(OBJ_DIR) -DACCESS_SECURITY -D_NO_PROTO
+CFLAGS += -I$(EPICS_BASE)/include  -I$(SDDS_REPO)/include -I$(OBJ_DIR) -I$(MOTIF_INC) -I$(X11_INC) -DEDITRES
+#-D_GNU_SOURCE -D_DEFAULT_SOURCE
+#-DACCESS_SECURITY -D_NO_PROTO
 
 ifeq ($(OS), Linux)
   CFLAGS += -I$(EPICS_BASE)/include/compiler/gcc -I$(EPICS_BASE)/include/os/$(OS)
@@ -27,7 +29,9 @@ ifeq ($(OS), Linux)
     $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libpvData.a \
     $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libca.a \
     $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libCom.a \
-    $(LZMA_LIB) $(GSL_LIB) $(GSLCBLAS_LIB) $(Z_LIB) -lXm -lXt -lXp -lXmu -lX11 $(PROD_SYS_LIBS)
+    $(LZMA_LIB) $(GSL_LIB) $(GSLCBLAS_LIB) \
+    $(XM_LIB) $(XMU_LIB) $(XT_LIB) $(X11_LIB) \
+    $(Z_LIB) -lreadline $(PROD_SYS_LIBS)
   PROD_LIBS_SDDS = -lmdbcommon -lmatlib -lSDDS1 -lnamelist -lrpnlib -lmdbmth -lmdblib
 endif
 
