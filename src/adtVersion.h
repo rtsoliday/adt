@@ -8,8 +8,8 @@
 \*************************************************************************/
 /* adtVersion.h *** Version information for ADT */
 
-#define ADT_VERSION 1
-#define ADT_REVISION 5 
-#define ADT_MODIFICATION 7
+#define ADT_VERSION 2
+#define ADT_REVISION 0 
+#define ADT_MODIFICATION 0
 #define ADT_PATCH_LEVEL 0
-#define ADT_VERSION_STRING "ADT 1.5.7.0 (6-30-2023)"
+#define ADT_VERSION_STRING "ADT 2.0.0.0 (8-19-2025)"
