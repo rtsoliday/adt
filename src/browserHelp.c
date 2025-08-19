@@ -104,11 +104,13 @@ int callBrowser(char *url, char *bookmark)
 #if DEBUG
 	    printf("execute(before): cmd=%s\n",command);
 #endif	    
-	    status=execute(command);
+            status=execute(command);
 #if DEBUG
-	    printf("execute(after): cmd=%s status=%d\n",command,status);
-#endif	    
-	    return 1;
+            printf("execute(after): cmd=%s status=%d\n",command,status);
+#else
+            (void)status;
+#endif
+            return 1;
 	}
     }
   /* Netscape window is valid, send url via -remote */
@@ -138,7 +140,9 @@ int callBrowser(char *url, char *bookmark)
     status=execute(command);
 #if DEBUG
     printf("execute(after): cmd=%s status=%d\n",command,status);
-#endif    
+#else
+    (void)status;
+#endif
     return 2;
 }
 /**************************** checkNetscapeWindow ************************/

@@ -19,6 +19,7 @@
 #include <math.h>
 #include <time.h>
 #include <limits.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
@@ -311,7 +312,7 @@ void xerrmsg(char *fmt, ...);
 int xerrorhandler(Display *dpy, XErrorEvent *event);
 void xinfomsg(char *fmt, ...);
 int xpix(double z);
-void xterrorhandler(char *message);
+void xterrorhandler(char *message) __attribute__((noreturn));
 void zoomcontrolcb(Widget w, XtPointer clientdata, XtPointer calldata);
 
 /* Macro functions */

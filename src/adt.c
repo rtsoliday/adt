@@ -116,7 +116,7 @@ int main(int argc, char **argv)
 		configspecified=1;
 		break;
 	    case 'f':
-		if(++i < argc) strncpy(pvfilename,argv[i],PATH_MAX);
+                if(++i < argc) snprintf(pvfilename,PATH_MAX,"%s",argv[i]);
 		pvstartup=1;
 		break;
             case 'd':
@@ -192,8 +192,8 @@ int main(int argc, char **argv)
 #endif    
     
   /* Set error handlers */
-    XtAppSetErrorHandler(appcontext,xterrorhandler);
-    XtAppSetWarningHandler(appcontext,xterrorhandler);
+    XtAppSetErrorHandler(appcontext,(XtErrorHandler)xterrorhandler);
+    XtAppSetWarningHandler(appcontext,(XtErrorHandler)xterrorhandler);
     XSetErrorHandler(xerrorhandler);
     
   /* Fix up WM close */
@@ -628,7 +628,7 @@ Widget makegrapharea(int iarea)
     w=XmCreateTextField(areas[iarea].wcontrol,"floatEntry",args,nargs);
     XtManageChild(w);
     XtAddCallback(w,XmNactivateCallback,graphcontrolcb,
-      (XtPointer)(100*iarea+1));
+      (XtPointer)(intptr_t)(100*iarea+1));
     areas[iarea].wcenter=w;
     
   /* Define center value arrows */
@@ -638,14 +638,14 @@ Widget makegrapharea(int iarea)
     w=XmCreateArrowButton(areas[iarea].wcontrol,"arrow",args,nargs);
     XtManageChild(w);
     XtAddCallback(w,XmNactivateCallback,graphcontrolcb,
-      (XtPointer)(100*iarea+2));
+      (XtPointer)(intptr_t)(100*iarea+2));
     nargs=0;
     XtSetArg(args[nargs],XmNarrowDirection,XmARROW_DOWN); nargs++;
     XtSetArg(args[nargs],XmNtraversalOn,False); nargs++;
     w=XmCreateArrowButton(areas[iarea].wcontrol,"arrow",args,nargs);
     XtManageChild(w);
     XtAddCallback(w,XmNactivateCallback,graphcontrolcb,
-      (XtPointer)(100*iarea+3));
+      (XtPointer)(intptr_t)(100*iarea+3));
 
   /* Define graph drawing area */
     nargs=0;
@@ -658,9 +658,9 @@ Widget makegrapharea(int iarea)
     w=XmCreateDrawingArea(form,"graphArea",args,nargs);
     XtManageChild(w);
     XtAddEventHandler(w,ButtonPressMask|ButtonReleaseMask,False,
-      eventgraph,(XtPointer)areas[iarea].area);
-    XtAddCallback(w,XmNexposeCallback,repaintgraph,(XtPointer)areas[iarea].area);
-    XtAddCallback(w,XmNresizeCallback,resizegraph,(XtPointer)areas[iarea].area);
+      eventgraph,(XtPointer)(intptr_t)areas[iarea].area);
+    XtAddCallback(w,XmNexposeCallback,repaintgraph,(XtPointer)(intptr_t)areas[iarea].area);
+    XtAddCallback(w,XmNresizeCallback,resizegraph,(XtPointer)(intptr_t)areas[iarea].area);
     areas[iarea].wgrapharea=w;
   /* Return */
     return form;
@@ -773,7 +773,7 @@ Widget makezoomarea(void)
     XtSetArg(args[nargs],XmNtraversalOn,TRUE); nargs++;
     w=XmCreateTextField(zoomarea->wcontrol,"floatEntry",args,nargs);
     XtManageChild(w);
-    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)1);
+    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)(intptr_t)1);
     zoomarea->wcenter=w;
     
   /* Define center value arrows */
@@ -782,13 +782,13 @@ Widget makezoomarea(void)
     XtSetArg(args[nargs],XmNtraversalOn,False); nargs++;
     w=XmCreateArrowButton(zoomarea->wcontrol,"arrow",args,nargs);
     XtManageChild(w);
-    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)2);
+    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)(intptr_t)2);
     nargs=0;
     XtSetArg(args[nargs],XmNarrowDirection,XmARROW_DOWN); nargs++;
     XtSetArg(args[nargs],XmNtraversalOn,False); nargs++;
     w=XmCreateArrowButton(zoomarea->wcontrol,"arrow",args,nargs);
     XtManageChild(w);
-    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)3);
+    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)(intptr_t)3);
 
   /* Define graph interval control */
     cstring=XmStringCreateLocalized("Interval:");
@@ -809,7 +809,7 @@ Widget makezoomarea(void)
     XtSetArg(args[nargs],XmNtraversalOn,TRUE); nargs++;
     w=XmCreateTextField(zoomarea->wcontrol,"floatEntry",args,nargs);
     XtManageChild(w);
-    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)4);
+    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)(intptr_t)4);
     zoomarea->winterval=w;
     
   /* Define graph sector control */
@@ -830,7 +830,7 @@ Widget makezoomarea(void)
     XtSetArg(args[nargs],XmNtraversalOn,TRUE); nargs++;
     w=XmCreateTextField(zoomarea->wcontrol,"intEntry",args,nargs);
     XtManageChild(w);
-    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)5);
+    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)(intptr_t)5);
     zoomarea->wsector=w;
     
   /* Define graph sector arrows */
@@ -839,13 +839,13 @@ Widget makezoomarea(void)
     XtSetArg(args[nargs],XmNtraversalOn,False); nargs++;
     w=XmCreateArrowButton(zoomarea->wcontrol,"arrow",args,nargs);
     XtManageChild(w);
-    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)6);
+    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)(intptr_t)6);
     nargs=0;
     XtSetArg(args[nargs],XmNarrowDirection,XmARROW_RIGHT); nargs++;
     XtSetArg(args[nargs],XmNtraversalOn,False); nargs++;
     w=XmCreateArrowButton(zoomarea->wcontrol,"arrow",args,nargs);
     XtManageChild(w);
-    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)7);
+    XtAddCallback(w,XmNactivateCallback,zoomcontrolcb,(XtPointer)(intptr_t)7);
 
   /* Define graph drawing area */
     nargs=0;
@@ -884,7 +884,7 @@ Widget makescalemenu(Widget wparent, int iarea)
 	nargs=0;
 	w=XmCreatePushButton(w1,scalelabel[i],args,nargs);
 	XtManageChild(w);
-	XtAddCallback(w,XmNactivateCallback,scalemenucb,(XtPointer)(100*iarea+i));
+    XtAddCallback(w,XmNactivateCallback,scalemenucb,(XtPointer)(intptr_t)(100*iarea+i));
     }
     return w1;
 }

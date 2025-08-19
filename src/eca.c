@@ -81,7 +81,7 @@ static void ecaabort(void)
 /**************************** ecacb ***************************************/
 void ecacb(Widget w, XtPointer clientdata, XtPointer calldata)
 {
-    switch((int)clientdata) {
+    switch((intptr_t)clientdata) {
     case 0:
 	if(ecaresponding) {
 	    ecaresponding=0;
@@ -411,10 +411,10 @@ static void ecaregisterfd(void *dummy, int fd, int opened)
 	    return;
 	}
 	cur->prev=inpstart;
-	cur->inpid=XtAppAddInput(appcontext,fd,
-	  (XtPointer)inputReadMask,
-	  ecaprocesscb,
-	  (XtPointer)NULL);
+        cur->inpid=XtAppAddInput(appcontext,fd,
+          (XtPointer)(intptr_t)inputReadMask,
+          ecaprocesscb,
+          (XtPointer)NULL);
  	cur->fd=fd;
 	inpstart=cur;
 #if DEBUG_INPUT_ID

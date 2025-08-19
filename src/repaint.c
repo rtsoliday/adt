@@ -427,7 +427,7 @@ void repaintgraph(Widget w, XtPointer clientdata, XtPointer calldata)
     int doreference=reference && refon;
     
 /* Find which area */
-    iarea=(int)clientdata;
+    iarea=(intptr_t)clientdata;
     area=&areas[iarea];
 /* Initialize the scale factors */
     if(area->graphinitialize) {
@@ -611,7 +611,7 @@ void repaintlogo(Widget w, XtPointer clientdata, XtPointer calldata)
     xstart=(wwidth-width)/2;
     XDrawString(display,win,gc,xstart,ystart+linespacing,string,len);
 
-    sprintf(string,unamestring);
+    snprintf(string,sizeof string,"%s",unamestring);
     len=(int)strlen(string);
     width=XTextWidth(fontinfo,string,len);
     xstart=(wwidth-width)/2;
@@ -794,7 +794,7 @@ void resetgraph(void)
     int ia;
     
     for(ia=0; ia < nareas; ia++) {
-	repaintgraph(areas[ia].wgrapharea,(XtPointer)areas[ia].area,(XtPointer)NULL);
+        repaintgraph(areas[ia].wgrapharea,(XtPointer)(intptr_t)areas[ia].area,(XtPointer)NULL);
     }
     if(zoom && zoomon)
 	repaintzoom((Widget)0,(XtPointer)0,(XtPointer)0);
@@ -811,7 +811,7 @@ void resizegraph(Widget w, XtPointer clientdata, XtPointer calldata)
     double cbptos,cbptox,cbstop,cbxtop;
     
 /* Find which area */
-    ia=(int)clientdata;
+    ia=(intptr_t)clientdata;
 /* Get window size */
     win=XtWindow(w);
     if(!win) return;

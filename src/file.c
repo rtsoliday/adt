@@ -106,7 +106,10 @@ int readinit(char *filename)
 		    strncpy(customdirectory,strptr,PATH_MAX);
 		    customdirectory[PATH_MAX-1]='\0';
 		}
-		if(strptr) SDDS_Free(strptr); strptr=NULL;
+		if (strptr) {
+		  SDDS_Free(strptr);
+		}
+		strptr = NULL;
 	    }
 	  /* Get ADTPVSubDirectory */
 	    if(checkparameter(&table,"ADTPVSubDirectory",filename,CHECK)) {
@@ -120,7 +123,10 @@ int readinit(char *filename)
                     sprintf(customdirectory,"%s", adthome);
                   }
 		}
-		if(strptr) SDDS_Free(strptr); strptr=NULL;
+		if (strptr) {
+		  SDDS_Free(strptr);
+		}
+		strptr = NULL;
 	    }
 	  /* Get ADTSnapDirectory */
 	    if(checkparameter(&table,"ADTSnapDirectory",filename,CHECK)) {
@@ -129,7 +135,10 @@ int readinit(char *filename)
 		    strncpy(snapdirectory,strptr,PATH_MAX);
 		    snapdirectory[PATH_MAX-1]='\0';
 		}
-		if(strptr) SDDS_Free(strptr); strptr=NULL;
+		if (strptr) {
+		  SDDS_Free(strptr);
+		}
+		strptr = NULL;
 	    }
 	  /* Get Xorbit directories if necessary */
 	    if(xorbit) {
@@ -142,7 +151,10 @@ int readinit(char *filename)
 			strncpy(customdirectory,strptr,PATH_MAX);
 			customdirectory[PATH_MAX-1]='\0';
 		    }
-		    if(strptr) SDDS_Free(strptr); strptr=NULL;
+		    if (strptr) {
+		      SDDS_Free(strptr);
+		    }
+		    strptr = NULL;
 		}
 	      /* Get ADTXSnapDirectory */
 		if(checkparameter(&table,"ADTXSnapDirectory",filename,CHECK)) {
@@ -151,7 +163,10 @@ int readinit(char *filename)
 			strncpy(snapdirectory,strptr,PATH_MAX);
 			snapdirectory[PATH_MAX-1]='\0';
 		    }
-		    if(strptr) SDDS_Free(strptr); strptr=NULL;
+		    if (strptr) {
+		      SDDS_Free(strptr);
+		    }
+		    strptr = NULL;
 		}
 	    }
 	  /* Get ADTHelpFile */
@@ -161,7 +176,10 @@ int readinit(char *filename)
 		    strncpy(browserfile,strptr,PATH_MAX);
 		    browserfile[PATH_MAX-1]='\0';
 		}
-		if(strptr) SDDS_Free(strptr); strptr=NULL;
+		if (strptr) {
+		  SDDS_Free(strptr);
+		}
+		strptr = NULL;
 	    }
 	  /* Allocate filename array pointers */
 	    if(!SDDS_GetParameterAsLong(&table,"ADTNMenus",&templong)) {
@@ -234,7 +252,10 @@ int readinit(char *filename)
 	XtSetArg(args[nargs],XmNsubMenuId,w1); nargs++;
 	w=XmCreateCascadeButton(loadmenu,strptr,args,nargs);
 	XtManageChild(w);
-	if(strptr) SDDS_Free(strptr); strptr=NULL;
+	if (strptr) {
+	  SDDS_Free(strptr);
+	}
+	strptr = NULL;
       /* Add buttons */
 	for(i=0; i < npvfiles; i++) {
 	    nargs=0;
@@ -373,11 +394,17 @@ int readlat(char *filename)
     }
     if(strcmp(strptr,LATID)) {
 	xerrmsg("Not a valid ADT Lattice file: %s",filename);
-	if(strptr) SDDS_Free(strptr); strptr=NULL;
+	if (strptr) {
+	  SDDS_Free(strptr);
+	}
+	strptr = NULL;
 	SDDS_Terminate(&table);
 	return 0;
     }
-    if(strptr) SDDS_Free(strptr); strptr=NULL;
+    if (strptr) {
+      SDDS_Free(strptr);
+    }
+    strptr = NULL;
     if(nsect_exists) {
 	if(!(SDDS_GetParameterAsLong(&table,"Nsectors",&templong))) {
 	    SDDS_PrintErrors(stderr,SDDS_VERBOSE_PrintErrors|SDDS_EXIT_PrintErrors);
@@ -581,12 +608,18 @@ int readpvs(char *filename)
 		} else {
 		    if(strcmp(strptr,PVID)) {
 			xerrmsg("Not a valid ADT PV file: %s",filename);
-			if(strptr) SDDS_Free(strptr); strptr=NULL;
+			if (strptr) {
+			  SDDS_Free(strptr);
+			}
+			strptr = NULL;
 			SDDS_Terminate(&table);
 			return 0;
 		    }
 		}
-		if(strptr) SDDS_Free(strptr); strptr=NULL;
+		if (strptr) {
+		  SDDS_Free(strptr);
+		}
+		strptr = NULL;
 	    } else {
 		xerrmsg("Could not get ADTFileType in %s",filename);
 		SDDS_Terminate(&table);
@@ -654,11 +687,21 @@ int readpvs(char *filename)
 		    *latfilename='\0';
 		} else {
 		    zoom=1;
-		    if(!strchr(strptr,'/')) sprintf(latfilename,"%s/%s",pvdirectory,strptr);
-		    else strncpy(latfilename,strptr,PATH_MAX);
-		    latfilename[PATH_MAX-1]='\0';
+                    if(!strchr(strptr,'/')) {
+                      char tmp[2*PATH_MAX];
+                      snprintf(tmp, sizeof(tmp), "%s/%s", pvdirectory, strptr);
+                      strncpy(latfilename, tmp, PATH_MAX-1);
+                      latfilename[PATH_MAX-1]='\0';
+                    }
+                    else {
+                      strncpy(latfilename,strptr,PATH_MAX-1);
+                      latfilename[PATH_MAX-1]='\0';
+                    }
 		}
-		if(strptr) SDDS_Free(strptr); strptr=NULL;
+		if (strptr) {
+		  SDDS_Free(strptr);
+		}
+		strptr = NULL;
 	    } else {
 		zoom=0;
 		*latfilename='\0';
@@ -671,11 +714,21 @@ int readpvs(char *filename)
 		    *reffilename='\0';
 		} else {
 		    reference=1;
-		    if(!strchr(strptr,'/')) sprintf(reffilename,"%s/%s",snapdirectory,strptr);
-		    else strncpy(reffilename,strptr,PATH_MAX);
-		    reffilename[PATH_MAX-1]='\0';		      
+                    if(!strchr(strptr,'/')) {
+                      char tmp[2*PATH_MAX];
+                      snprintf(tmp, sizeof(tmp), "%s/%s", snapdirectory, strptr);
+                      strncpy(reffilename, tmp, PATH_MAX-1);
+                      reffilename[PATH_MAX-1]='\0';
+                    }
+                    else {
+                      strncpy(reffilename,strptr,PATH_MAX-1);
+                      reffilename[PATH_MAX-1]='\0';
+                    }
 		}
-		if(strptr) SDDS_Free(strptr); strptr=NULL;
+		if (strptr) {
+		  SDDS_Free(strptr);
+		}
+		strptr = NULL;
 	    } else {
 		reference=0;
 		*reffilename='\0';
@@ -757,7 +810,10 @@ int readpvs(char *filename)
 	      colorname,iarray+1,filename);
 	    arrays[iarray].pixel=blackpixel;
 	} else arrays[iarray].pixel=newcolordef.pixel;
-	if(strptr) SDDS_Free(strptr); strptr=NULL;
+	if (strptr) {
+	  SDDS_Free(strptr);
+	}
+	strptr = NULL;
 	colorname=NULL;
       /* Get heading */
 	if(checkparameter(&table,"ADTHeading",filename,CHECK)) {
@@ -773,7 +829,10 @@ int readpvs(char *filename)
 		arrays[iarray].heading=(char *)calloc(len,sizeof(char));
 		strncpy(arrays[iarray].heading,strptr,len);
 		arrays[iarray].heading[len-1]='\0';
-		if(strptr) SDDS_Free(strptr); strptr=NULL;
+		if (strptr) {
+		  SDDS_Free(strptr);
+		}
+		strptr = NULL;
 	    }
 	} else {
 	    sprintf(string,"Array %d",iarray+1);     /* Default heading */
@@ -792,7 +851,10 @@ int readpvs(char *filename)
 		arrays[iarray].units=(char *)calloc(len,sizeof(char));
 		strncpy(arrays[iarray].units,strptr,len);
 		arrays[iarray].units[len-1]='\0';
-		if(strptr) SDDS_Free(strptr); strptr=NULL;
+		if (strptr) {
+		  SDDS_Free(strptr);
+		}
+		strptr = NULL;
 	    }
 	} else {
 	    if(!SDDS_GetParameter(&table,"ADTUnits",&arrays[iarray].units)) {
@@ -1220,10 +1282,16 @@ int readreference(char *filename)
 	    if(strcmp(tempstring,SNAPID)) {
 		xerrmsg("Not a valid ADT Reference/Snapshot file: %s",filename);
 		SDDS_Terminate(&table);
-		if(tempstring) SDDS_Free(tempstring); tempstring=NULL;
+		if (tempstring) {
+		  SDDS_Free(tempstring);
+		}
+		tempstring = NULL;
 		return 0;
 	    }
-	    if(tempstring) SDDS_Free(tempstring); tempstring=NULL;
+	    if (tempstring) {
+	      SDDS_Free(tempstring);
+	    }
+	    tempstring = NULL;
 	}     /* End first time */
       /* Get number of rows */
 	nvals=SDDS_CountRowsOfInterest(&table);
@@ -1344,10 +1412,16 @@ int readsnap(char *filename, int nsave)
 	    if(strcmp(tempstring,SNAPID)) {
 		xerrmsg("Not a valid ADT Snapshot file: %s",filename);
 		SDDS_Terminate(&table);
-		if(tempstring) SDDS_Free(tempstring); tempstring=NULL;
+		if (tempstring) {
+		  SDDS_Free(tempstring);
+		}
+		tempstring = NULL;
 		return 0;
 	    }
-	    if(tempstring) SDDS_Free(tempstring); tempstring=NULL;
+	    if (tempstring) {
+	      SDDS_Free(tempstring);
+	    }
+	    tempstring = NULL;
 	  /* Get timestamp */
 	    if(checkparameter(&table,"TimeStamp",filename,CHECK)) {
 		tempstring=NULL;
@@ -1358,7 +1432,10 @@ int readsnap(char *filename, int nsave)
 		    strncpy(time,tempstring,24);
 		    time[24]='\0';
 		}
-		if(tempstring) SDDS_Free(tempstring); tempstring=NULL;
+		if (tempstring) {
+		  SDDS_Free(tempstring);
+		}
+		tempstring = NULL;
 	    } else {
 		strcpy(time,"Unknown");
 		time[24]='\0';

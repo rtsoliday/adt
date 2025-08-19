@@ -22,7 +22,7 @@ void eventgraph(Widget w,  XtPointer clientdata, XEvent *event,
     double val;
     
 /* Find which area */
-    iarea=(int)clientdata;
+    iarea=(intptr_t)clientdata;
     area=&areas[iarea];
 /* Set pixel conversion coefficients */    
     aptox=area->aptox;

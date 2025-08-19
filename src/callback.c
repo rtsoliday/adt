@@ -24,8 +24,8 @@ extern char *mktemp(char *);
 void clearcb(Widget w, XtPointer clientdata, XtPointer calldata)
 {
     int ia;
-    
-    switch((int)clientdata) {
+
+    switch((intptr_t)clientdata) {
     case 1:
 	for(ia=0; ia < nareas; ia++) {
 	    areas[ia].tempnodraw=1;
@@ -277,16 +277,16 @@ void filereferencecb(Widget w, XtPointer clientdata,  XtPointer calldata)
 	}
       /* Cleanup */
 	XtDestroyWidget(wdialog);
-	if(!readreference(filename)) {
-	    xerrmsg("Could not read reference data\n"
-	      "Referencing is inactive");
-	    reference=0;
-	}
-	else {
-	    reference=1;
-	    maketitle();
-	    strncpy(reffilename,filename,PATH_MAX);
-	}
+        if(!readreference(filename)) {
+            xerrmsg("Could not read reference data\n"
+              "Referencing is inactive");
+            reference=0;
+        }
+        else {
+            reference=1;
+            maketitle();
+            snprintf(reffilename,PATH_MAX,"%s",filename);
+        }
 	XtFree(filename);
     }
     else {
@@ -362,10 +362,10 @@ void graphcontrolcb(Widget w, XtPointer clientdata, XtPointer calldata)
     int iarea,len,n;
     char *value;
     double scaleval;
-    
-    iarea=((int)clientdata)/100;
+
+    iarea=((intptr_t)clientdata)/100;
     scaleval=scale[areas[iarea].curscale];
-    n=(int)clientdata-100*iarea;
+    n=(intptr_t)clientdata-100*iarea;
     switch(n) {
     case 1:     /* Center value */
 	value=XmTextFieldGetString(areas[iarea].wcenter);
@@ -396,13 +396,13 @@ void graphcontrolcb(Widget w, XtPointer clientdata, XtPointer calldata)
     XtSetArg(args[nargs],XmNvalue,string); nargs++;
     XtSetValues(areas[iarea].wcenter,args,nargs);
     areas[iarea].tempclear=1;
-    resizegraph(areas[iarea].wgrapharea,(XtPointer)areas[iarea].area,(XtPointer)0);
+    resizegraph(areas[iarea].wgrapharea,(XtPointer)(intptr_t)areas[iarea].area,(XtPointer)0);
 }
 /**************************** helpcb **************************************/
 void helpcb(Widget w, XtPointer clientdata, XtPointer calldata)
 {
     int n;
-    n=(int)clientdata;
+    n=(intptr_t)clientdata;
     
     switch(n) {
     case 0:
@@ -461,8 +461,8 @@ void openmenucustomcb(Widget w, XtPointer clientdata,  XtPointer calldata)
       (XmFileSelectionBoxCallbackStruct *)calldata;
     static Widget wdialog;
     int n;
-    
-    n=(int)clientdata;
+
+    n=(intptr_t)clientdata;
     if(n == 0) {
 	XmString pattern=XmStringCreateLocalized(PVPATTERN);
 	XmString directory=XmStringCreateLocalized(customdirectory);
@@ -528,8 +528,8 @@ void openmenucustomcb(Widget w, XtPointer clientdata,  XtPointer calldata)
 void optcb(Widget w, XtPointer clientdata, XtPointer calldata)
 {
     int i;
-    
-    switch((int)clientdata) {
+
+    switch((intptr_t)clientdata) {
     case 5:
 	refon=XmToggleButtonGetState(w)?1:0;
 	maketitle();
@@ -627,7 +627,7 @@ void orbitdiffcb(Widget w, XtPointer clientdata, XtPointer calldata)
 	    XtSetArg(args[nargs],XmNvalue,string); nargs++;
 	    XtSetValues(areas[iarea].wcenter,args,nargs);
 	    areas[iarea].tempclear=1;
-	    resizegraph(areas[iarea].wgrapharea,(XtPointer)areas[iarea].area,(XtPointer)0);
+            resizegraph(areas[iarea].wgrapharea,(XtPointer)(intptr_t)areas[iarea].area,(XtPointer)0);
 	}
 	if(zoom) {
 	    zoomarea->centerval=zoomarea->oldcenterval;
@@ -723,9 +723,9 @@ void quitfunc(Widget w, XtPointer clientdata, XtPointer calldata)
 void scalemenucb(Widget w, XtPointer clientdata, XtPointer calldata)
 {
     int iarea,iscale;
-    
-    iarea=((int)clientdata)/100;
-    iscale=(int)clientdata-100*iarea;
+
+    iarea=((intptr_t)clientdata)/100;
+    iscale=(intptr_t)clientdata-100*iarea;
     if(iarea < nareas) {
 	areas[iarea].curscale=iscale;
 	areas[iarea].xmax=(areas[iarea].centerval+
@@ -741,7 +741,7 @@ void scalemenucb(Widget w, XtPointer clientdata, XtPointer calldata)
 	XmStringFree(cstring);
 	areas[iarea].graphinitialize=1;
 	areas[iarea].tempclear=1;
-	repaintgraph(areas[iarea].wgrapharea,(XtPointer)areas[iarea].area,(XtPointer)0);
+        repaintgraph(areas[iarea].wgrapharea,(XtPointer)(intptr_t)areas[iarea].area,(XtPointer)0);
     }
     else {
 	zoomarea->curscale=iscale;
@@ -765,8 +765,8 @@ void scalemenucb(Widget w, XtPointer clientdata, XtPointer calldata)
 void viewcb(Widget w, XtPointer clientdata, XtPointer calldata)
 {
     int i,ia;
-    
-    switch((int)clientdata) {
+
+    switch((intptr_t)clientdata) {
     case 0:
 	status();
 	break;
@@ -867,9 +867,9 @@ void zoomcontrolcb(Widget w, XtPointer clientdata, XtPointer calldata)
     int len,n,changecenter=0;
     char *value;
     double scaleval;
-    
+
     scaleval=scale[zoomarea->curscale];
-    n=(int)clientdata;
+    n=(intptr_t)clientdata;
     switch(n) {
     case 1:     /* Center value */
 	value=XmTextFieldGetString(zoomarea->wcenter);

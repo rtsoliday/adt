@@ -303,7 +303,7 @@ void xinfomsg(char *fmt, ...)
     }
 }
 /**************************** xterrorhandler ******************************/
-void xterrorhandler(char *message)
+__attribute__((noreturn)) void xterrorhandler(char *message)
 {
 #ifdef WIN32
     lprintf("%s\n",message);
@@ -311,6 +311,7 @@ void xterrorhandler(char *message)
     fprintf(stderr,"%s\n",message);
 #endif
     if(windowmessage) xerrmsg(message);
+    exit(EXIT_FAILURE);
 }
 /**************************** print ***************************************/
 /* General purpose output routine
