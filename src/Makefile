@@ -11,11 +11,23 @@ include ../Makefile.rules
 
 PROD = adt xintolat
 
+ifdef MOTIF
 adt_SRC = adt.c callback.c repaint.c event.c ut.c eca.c menu.c pix.c browserHelp.c file.c
+else
+adt_SRC = adt_qt.cc
+endif
 xintolat_SRC = xintolat.c
 
 
-CFLAGS += -I$(EPICS_BASE)/include  -I$(SDDS_REPO)/include -I$(OBJ_DIR) -I$(MOTIF_INC) -I$(X11_INC) -DEDITRES
+CFLAGS += -I$(EPICS_BASE)/include  -I$(SDDS_REPO)/include -I$(OBJ_DIR) -DEDITRES
+CCFLAGS += -I$(EPICS_BASE)/include -I$(SDDS_REPO)/include -I$(OBJ_DIR) -DEDITRES
+ifdef MOTIF
+  CFLAGS += -I$(MOTIF_INC) -I$(X11_INC)
+  CCFLAGS += -I$(MOTIF_INC) -I$(X11_INC)
+else
+  CCFLAGS += $(shell pkg-config --cflags Qt5Widgets)
+  LDFLAGS += $(shell pkg-config --libs Qt5Widgets)
+endif
 #-D_GNU_SOURCE -D_DEFAULT_SOURCE
 #-DACCESS_SECURITY -D_NO_PROTO
 
@@ -30,8 +42,10 @@ ifeq ($(OS), Linux)
     $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libca.a \
     $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libCom.a \
     $(LZMA_LIB) $(GSL_LIB) $(GSLCBLAS_LIB) \
-    $(XM_LIB) $(XMU_LIB) $(XT_LIB) $(X11_LIB) \
     $(Z_LIB) -lreadline $(PROD_SYS_LIBS)
+  ifdef MOTIF
+    PROD_SYS_LIBS += $(XM_LIB) $(XMU_LIB) $(XT_LIB) $(X11_LIB)
+  endif
   PROD_LIBS_SDDS = -lmdbcommon -lmatlib -lSDDS1 -lnamelist -lrpnlib -lmdbmth -lmdblib
 endif
 

@@ -28,3 +28,8 @@ This repository is organized into the following top-level files and directories:
 - **Line length:** No strict maximum; some lines exceed 200 characters.
 
 These guidelines should be followed when contributing new code or documentation to maintain consistency with the existing project.
+
+## Compiling
+
+ADT now builds with Qt by default. To build the legacy Motif/X11
+version, invoke `MOTIF=1 make`.

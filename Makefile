@@ -23,6 +23,7 @@ ifeq ($(OS), Linux)
 endif
 
 include Makefile.rules
+export MOTIF
 
 DIRS = $(GSL_REPO)
 DIRS += $(GSL_LOCAL)
