@@ -19,6 +19,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QPainter>
+#include <QMessageBox>
 #include <QString>
 #include <QWidget>
 
@@ -27,7 +28,7 @@ class LogoWidget : public QWidget
 public:
   explicit LogoWidget(QWidget *parent = nullptr) : QWidget(parent)
   {
-    setMinimumSize(400, 200);
+    setMinimumSize(890, 185);
   }
 
 protected:
@@ -159,7 +160,23 @@ public:
     helpMenu->addAction("Overview");
     helpMenu->addAction("Mouse Operations");
     helpMenu->addAction("Color Code");
-    helpMenu->addAction("Version");
+    QAction *versionAct = helpMenu->addAction("Version");
+    connect(versionAct, &QAction::triggered, this, [this]()
+    {
+      struct utsname info;
+      QString unameStr;
+      if (uname(&info) != -1) {
+        unameStr = QString("Running %1 %2 on %3")
+          .arg(info.sysname)
+          .arg(info.release)
+          .arg(info.nodename);
+      }
+      QString msg = QString("%1 %2\n\nWritten by Dwarfs in the Waterfall Glen\n\n%3")
+        .arg(ADT_VERSION_STRING)
+        .arg(EPICS_VERSION_STRING)
+        .arg(unameStr);
+      QMessageBox::information(this, "ADT Version", msg);
+    });
   }
 };
 
