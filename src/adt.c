@@ -192,8 +192,8 @@ int main(int argc, char **argv)
 #endif    
     
   /* Set error handlers */
-    XtAppSetErrorHandler(appcontext,(XtErrorHandler)xterrorhandler);
-    XtAppSetWarningHandler(appcontext,(XtErrorHandler)xterrorhandler);
+    XtAppSetErrorHandler(appcontext, xterrorhandler);
+    XtAppSetWarningHandler(appcontext, xterrorhandler);
     XSetErrorHandler(xerrorhandler);
     
   /* Fix up WM close */
