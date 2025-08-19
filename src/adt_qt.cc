@@ -12,7 +12,11 @@
 #include <QApplication>
 #include <QBitmap>
 #include <QImage>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QFile>
 #include <QFont>
+#include <QByteArray>
 #include <QFontMetrics>
 #include <QLabel>
 #include <QMainWindow>
@@ -22,6 +26,93 @@
 #include <QMessageBox>
 #include <QString>
 #include <QWidget>
+#include <QList>
+
+#include <SDDS.h>
+#include <QDir>
+
+#define INITFILENAME "adtrc"
+
+struct LoadItem
+{
+  QString label;
+  QString file;
+};
+
+struct LoadMenuInfo
+{
+  QString title;
+  QList<LoadItem> items;
+};
+
+static QList<LoadMenuInfo> readInitFile(const QString &filename,
+  const QString &adtHome, QString &pvDirectory, QString &customDirectory)
+{
+  QList<LoadMenuInfo> menus;
+  pvDirectory = adtHome + "/pv";
+  customDirectory = pvDirectory;
+  if (filename.isEmpty())
+    return menus;
+  SDDS_TABLE table;
+  QByteArray fname = filename.toUtf8();
+  if (!SDDS_InitializeInput(&table, fname.data()))
+    return menus;
+  int foundLabels = SDDS_CheckColumn(&table, const_cast<char *>("ADTMenuLabel"),
+    NULL, SDDS_STRING, NULL) == SDDS_CHECK_OKAY;
+  bool first = true;
+  while (SDDS_ReadTable(&table) > 0) {
+    if (first) {
+      char *dir = NULL;
+      if (SDDS_GetParameter(&table, const_cast<char *>("ADTPVDirectory"), &dir)) {
+        pvDirectory = dir;
+        customDirectory = dir;
+        SDDS_Free(dir);
+      }
+      char *subdir = NULL;
+      if (SDDS_GetParameter(&table, const_cast<char *>("ADTPVSubDirectory"),
+        &subdir)) {
+        if (subdir[0]) {
+          pvDirectory = adtHome + "/" + subdir;
+          customDirectory = pvDirectory;
+        } else {
+          pvDirectory = adtHome;
+          customDirectory = adtHome;
+        }
+        SDDS_Free(subdir);
+      }
+      first = false;
+    }
+    LoadMenuInfo menu;
+    char *title = NULL;
+    if (SDDS_GetParameter(&table, const_cast<char *>("ADTMenuTitle"), &title)) {
+      menu.title = title;
+      SDDS_Free(title);
+    }
+    int rows = SDDS_CountRowsOfInterest(&table);
+    char **files = (char **)SDDS_GetColumn(&table,
+      const_cast<char *>("ADTPVFile"));
+    char **labels = foundLabels ? (char **)SDDS_GetColumn(&table,
+      const_cast<char *>("ADTMenuLabel")) : NULL;
+    for (int i = 0; i < rows; ++i) {
+      QString fname = pvDirectory + "/" + files[i];
+      QString lab = labels ? labels[i] : files[i];
+      menu.items.append({lab, fname});
+    }
+    if (files) {
+      for (int i = 0; i < rows; ++i)
+        SDDS_Free(files[i]);
+      SDDS_Free(files);
+    }
+    if (labels) {
+      for (int i = 0; i < rows; ++i)
+        SDDS_Free(labels[i]);
+      SDDS_Free(labels);
+    }
+    menus.append(menu);
+  }
+  SDDS_Terminate(&table);
+  return menus;
+}
 
 class LogoWidget : public QWidget
 {
@@ -82,11 +173,33 @@ public:
     setCentralWidget(logo);
 
     QMenu *fileMenu = menuBar()->addMenu("File");
+    QString adtHome = qEnvironmentVariable("ADTHOME", ".");
+    QString initFile = QDir::home().filePath("." INITFILENAME);
+    if (!QFile::exists(initFile))
+      initFile = QDir(adtHome).filePath(INITFILENAME);
+    QString pvDir;
+    QList<LoadMenuInfo> menus = readInitFile(initFile, adtHome, pvDir,
+      customDirectory);
     QMenu *loadMenu = fileMenu->addMenu("Load");
-    for (int i = 1; i <= NSAVE; ++i)
-      loadMenu->addAction(QString::number(i));
+    for (const auto &menu : menus) {
+      QMenu *sub = loadMenu->addMenu(menu.title);
+      for (const auto &item : menu.items) {
+        QAction *act = sub->addAction(item.label);
+        connect(act, &QAction::triggered, this, [this, item]() {
+          loadPvFile(item.file);
+        });
+      }
+    }
     loadMenu->addSeparator();
-    loadMenu->addAction("Custom...");
+    QAction *customAct = loadMenu->addAction("Custom...");
+    connect(customAct, &QAction::triggered, this, [this]() {
+      QString fn = QFileDialog::getOpenFileName(this, "Choose PV File",
+        customDirectory, "PV Files (*.pv)");
+      if (!fn.isEmpty()) {
+        customDirectory = QFileInfo(fn).absolutePath();
+        loadPvFile(fn);
+      }
+    });
     fileMenu->addAction("Read Reference");
     QMenu *readSnapMenu = fileMenu->addMenu("Read Snapshot");
     for (int i = 1; i <= NSAVE; ++i)
@@ -177,6 +290,16 @@ public:
         .arg(unameStr);
       QMessageBox::information(this, "ADT Version", msg);
     });
+  }
+
+private:
+  QString customDirectory;
+  QString pvFilename;
+
+  void loadPvFile(const QString &file)
+  {
+    pvFilename = file;
+    QMessageBox::information(this, "ADT", "PV file set to:\n" + file);
   }
 };
 
