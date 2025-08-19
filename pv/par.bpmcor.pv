@@ -1,0 +1,111 @@
+SDDS1
+&description
+  text="ADT PV file for PAR Monitors and Corrector Setpoints"
+&end
+&parameter name=ADTFileType fixed_value="ADTPV" type=string &end
+&parameter name=ADTNArrays type=short fixed_value=4 &end
+&parameter name=ADTNAreas type=short fixed_value=2 &end
+&parameter name=ADTBars type=short fixed_value=0 &end
+&parameter name=ADTLatticeFile type=string fixed_value="par.lat" &end
+!&parameter name=ADTReferenceFile fixed_value="" type=string &end
+&parameter name=ADTHeading type=string &end
+&parameter name=ADTUnits type=string &end
+&parameter name=ADTUnitsPerDiv type=double &end
+&parameter name=ADTScaleFactor type=double &end
+&parameter name=ADTCenterVal type=double &end
+&parameter name=ADTDisplayArea type=short &end
+&parameter name=ADTZoomArea type=short fixed_value=1 &end
+!&parameter name=ADTLogScale type=short &end
+&parameter name=ADTColor type=string &end
+&column name=ControlName type=string &end
+&column name=ControlType type=string &end
+&column name=ControlMode type=string &end
+&data mode=ascii no_row_counts=1 additional_header_lines=1 &end
+
+! x BPM readings
+PAR HORIZONTAL BPM'S
+mm
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+1       ! ADTDisplayArea
+Red
+P1P4:x pv RO
+P1P3:x pv RO
+P1P2:x pv RO
+P1P1:x pv RO
+P2P1:x pv RO
+P2P2:x pv RO
+P2P3:x pv RO
+P2P4:x pv RO
+P3P4:x pv RO
+P3P3:x pv RO
+P3P2:x pv RO
+P3P1:x pv RO
+P4P1:x pv RO
+P4P2:x pv RO
+P4P3:x pv RO
+P4P4:x pv RO
+
+! y BPM readings
+PAR VERTICAL BPM'S
+mm
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+1       ! ADTDisplayArea
+Blue
+P1P4:y pv RO
+P1P3:y pv RO
+P1P2:y pv RO
+P1P1:y pv RO
+P2P1:y pv RO
+P2P2:y pv RO
+P2P3:y pv RO
+P2P4:y pv RO
+P3P4:y pv RO
+P3P3:y pv RO
+P3P2:y pv RO
+P3P1:y pv RO
+P4P1:y pv RO
+P4P2:y pv RO
+P4P3:y pv RO
+P4P4:y pv RO
+
+! x Correctors
+PAR HORIZONTAL CORRECTOR SETPOINTS
+Amperes
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+2       ! ADTDisplayArea
+Magenta
+P1H3:CurrentAO pv -
+P1H2:CurrentAO pv -
+P1H1:CurrentAO pv -
+P2H1:CurrentAO pv -
+P2H2:CurrentAO pv -
+P2H3:CurrentAO pv -
+P3H2:CurrentAO pv -
+P3H1:CurrentAO pv -
+P4H1:CurrentAO pv -
+P4H2:CurrentAO pv -
+
+! y Correctors
+PAR VERTICAL CORRECTOR SETPOINTS
+Amperes
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+2       ! ADTDisplayArea
+Purple
+P1V3:CurrentAO pv -
+P1V2:CurrentAO pv -
+P1V1:CurrentAO pv -
+P2V1:CurrentAO pv -
+P2V2:CurrentAO pv -
+P2V3:CurrentAO pv -
+P3V2:CurrentAO pv -
+P3V1:CurrentAO pv -
+P4V1:CurrentAO pv -
+P4V2:CurrentAO pv -

@@ -1,0 +1,49 @@
+SDDS1
+&description text="ADT Initialization File"
+  contents="ADT Initialization File" &end
+&parameter name=ADTNMenus type=short fixed_value=7 &end
+&parameter name=ADTHelpFile type=string fixed_value="http://www.aps.anl.gov/asd/oag/manuals/adt/adt.html" &end
+!&parameter name=ADTSnapDirectory type=string fixed_value="~/op/orbitscreen/snap" &end
+&parameter name=ADTMenuTitle type=string &end
+&column name=ADTPVFile type=string &end
+&column name=ADTMenuLabel type=string &end
+&data mode=ascii no_row_counts=1 additional_header_lines=1 &end
+!
+!Test
+!"test1.pv"           "2 Arrays, 2 Areas"
+!"test2.pv"           "4 Arrays, 3 Areas"
+!"test3.pv"           "4 Arrays, 2 Areas, Scaling"
+!"zoomtest.pv"        "4 Arrays, 2 Areas, Scaling, Zoom, Reference"
+!"logtest.pv"         "2 Arrays, 1 log"
+
+Linac
+"linac.bpm.pv"       "Linac Horizontal and Vertical BPM's"
+
+LTP
+"ltp.bpm.pv"         "LTP Horizontal and Vertical BPM's"
+"ltp.bpmcor.pv"      "LTP BPM's and Corrector Setpoints"
+
+Par
+"par.bpm.pv"         "PAR Horizontal and Vertical BPM's"
+"par.bpmcor.pv"      "PAR BPM's and Corrector Setpoints"
+"par.corsetread.pv"  "PAR Corrector Setpoints and Readbacks"
+"par.setread.pv"     "PAR All Magnet Setpoints and Readbacks"
+
+PTB
+"ptb.bpm.pv"         "PTB Horizontal and Vertical BPM's"
+"ptb.bpmcor.pv"      "PTB BPM's and Corrector Setpoints"
+
+Booster
+"booster.bpm.pv"      "BOOSTER Horizontal and Vertical BPM's"
+"booster.bpmcor.pv"   "BOOSTER BPM's and Corrector Setpoints"
+"booster.bpmhcor.pv"  "BOOSTER BPM's and Horizontal Corrector Setpoints"
+"booster.bpmvcor.pv"  "BOOSTER BPM's and Vertical Corrector Setpoints"
+
+SR
+"sr.bpm.pv"          "SR Horizontal and Vertical BPM's"
+"sr.bpmsum.pv"       "SR BPM's and Sum Values"
+"sr.bpmcor.pv"       "SR BPM's and Corrector Setpoints"
+"sr.corsetread.pv"   "SR Corrector Setpoints and Readbacks"
+"sr.setread.pv"      "SR All Magnet Setpoints and Readbacks"
+"sr.logionpump.pv"   "SR Vacuum (LVAL)"
+"sr.ionpump.pv"      "SR Vacuum (VAL)"

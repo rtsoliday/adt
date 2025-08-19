@@ -1,0 +1,77 @@
+SDDS1
+&description
+  text="ADT PV file for PTB Monitors and Corrector Setpoints"
+&end
+&parameter name=ADTFileType fixed_value="ADTPV" type=string &end
+&parameter name=ADTNArrays type=short fixed_value=4 &end
+&parameter name=ADTNAreas type=short fixed_value=2 &end
+&parameter name=ADTBars type=short fixed_value=0 &end
+&parameter name=ADTLatticeFile type=string fixed_value="ptb.lat" &end
+!&parameter name=ADTReferenceFile fixed_value="" type=string &end
+&parameter name=ADTHeading type=string &end
+&parameter name=ADTUnits type=string &end
+&parameter name=ADTUnitsPerDiv type=double &end
+&parameter name=ADTScaleFactor type=double &end
+&parameter name=ADTCenterVal type=double &end
+&parameter name=ADTDisplayArea type=short &end
+&parameter name=ADTZoomArea type=short fixed_value=1 &end
+!&parameter name=ADTLogScale type=short &end
+&parameter name=ADTColor type=string &end
+&column name=ControlName type=string &end
+&column name=ControlType type=string &end
+&column name=ControlMode type=string &end
+&data mode=ascii no_row_counts=1 additional_header_lines=1 &end
+
+! x BPM readings
+PTB HORIZONTAL BPM'S
+mm
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+1       ! ADTDisplayArea
+Red
+PTB:PH1:x pv RO
+PTB:PH2:x pv RO
+PTB:PH3:x pv RO
+PTB:PH4:x pv RO
+PTB:PH5:x pv RO
+
+! y BPM readings
+PTB VERTICAL BPM'S
+mm
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+1       ! ADTDisplayArea
+Blue
+PTB:PV1:y pv RO
+PTB:PV2:y pv RO
+PTB:PV3:y pv RO
+PTB:PV4:y pv RO
+PTB:PV5:y pv RO
+
+! x Correctors
+PTB HORIZONTAL CORRECTOR SETPOINTS
+Amperes
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+2       ! ADTDisplayArea
+Magenta
+PTB:H1:CurrentAO pv -
+PTB:H2:CurrentAO pv -
+PTB:H3:CurrentAO pv -
+PTB:H4:CurrentAO pv -
+
+! y Correctors
+PTB VERTICAL CORRECTOR SETPOINTS
+Amperes
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+2       ! ADTDisplayArea
+Purple
+PTB:V1:CurrentAO pv -
+PTB:V2:CurrentAO pv -
+PTB:V3:CurrentAO pv -
+PTB:V4:CurrentAO pv -

@@ -1,0 +1,117 @@
+#*************************************************************************
+# Copyright (c) 2002 The University of Chicago, as Operator of Argonne
+# National Laboratory.
+# Copyright (c) 2002 The Regents of the University of California, as
+# Operator of Los Alamos National Laboratory.
+# This file is distributed subject to a Software License Agreement found
+# in the file LICENSE that is included with this distribution. 
+#*************************************************************************
+#
+# $Id: Makefile,v 1.12 2025/03/10 16:32:12 soliday Exp $
+#
+TOP = ../..
+include $(TOP)/configure/CONFIG
+
+# Debugging options
+#HOST_OPT = NO
+#DEBUGCMD = purify -first-only -chain-length=26
+
+CMPLR=STRICT
+
+WIN32_RUNTIME=MD
+USR_CFLAGS_WIN32 += $(EXCEED_CFLAGS)
+USR_CFLAGS_WIN32 += /DWIN32 /D_WINDOWS
+USR_LDFLAGS_WIN32 += /SUBSYSTEM:WINDOWS
+
+# Temporary
+#USR_LDFLAGS_WIN32 += /VERBOSE:LIB
+
+USR_CFLAGS += -DEDITRES
+USR_INCLUDES += -I$(MOTIF_INC) -I$(X11_INC)
+
+USR_CFLAGS += -I$(EPICS_EXTENSIONS)/include -I$(EPICS_EXTENSIONS)/src/SDDS/lzma -DzLib
+
+
+GSL = $(words $(wildcard ../../SDDS/gsl))
+ifeq ($(GSL), 1)
+GSLLIB = gsl gslcblas
+SYS_GSLLIB = 
+else
+#Look for system version of GSL
+SYSGSL = $(words $(notdir $(wildcard \
+/usr/lib/libgsl.a \
+/usr/lib/libgsl.so \
+/usr/lib64/libgsl.a \
+/usr/lib64/libgsl.so \
+/usr/lib/i386-linux-gnu/libgsl.so \
+/usr/lib/i386-linux-gnu/libgsl.a \
+/usr/lib/x86_64-linux-gnu/libgsl.so \
+/usr/lib/x86_64-linux-gnu/libgsl.a \
+/lib/i386-linux-gnu/libgsl.so \
+/lib/i386-linux-gnu/libgsl.a \
+/lib/x86_64-linux-gnu/libgsl.so \
+/lib/x86_64-linux-gnu/libgsl.a \
+/lib/libgsl.a \
+/lib/libgsl.so \
+/lib64/libgsl.a \
+/lib64/libgsl.so \
+/sw/lib/libgsl.a \
+/sw/lib/libgsl.dylib \
+/opt/local/lib/libgsl.a \
+/opt/local/lib/libgsl.dylib \
+/usr/sfw/lib/libgsl.a \
+/usr/sfw/lib/libgsl.so )))
+ifneq ($(SYSGSL), 0)
+GSLLIB = 
+SYS_GSLLIB = gsl gslcblas
+else
+#No GSL library found. Build without it.
+GSLLIB = 
+SYS_GSLLIB = 
+endif
+endif
+
+
+USR_LIBS_DEFAULT = SDDS1 rpnlib mdbmth mdblib $(GSLLIB) $(ZLIB_PROD_LIB) ca Com Xm Xt Xmu X11
+USR_LIBS_Linux = SDDS1 rpnlib mdbmth mdblib $(GSLLIB) ca Com Xm Xt Xp Xmu X11
+USR_LIBS_WIN32 = SDDS1 rnplib mdbmth mdblib lzma $(GSLLIB) $(ZLIB_PROD_LIB) ca Com $(EXCEED_XLIBS)
+
+ifeq ($(ZLIB_PROD_LIB),)
+  PROD_SYS_LIBS_DEFAULT += lzma z $(SYSGSL)
+  PROD_SYS_LIBS_WIN32 = -nil-
+endif
+
+SDDS1_DIR = $(EPICS_EXTENSIONS_LIB)
+lzma_DIR = $(EPICS_EXTENSIONS_LIB)
+mdblib_DIR = $(EPICS_EXTENSIONS_LIB)
+z_DIR = $(EPICS_EXTENSIONS_LIB)
+ca_DIR = $(EPICS_BASE_LIB)
+Com_DIR = $(EPICS_BASE_LIB)
+Xm_DIR = $(MOTIF_LIB)
+Xmu_DIR = $(X11_LIB)
+Xt_DIR =  $(X11_LIB)
+X11_DIR =  $(X11_LIB)
+Xp_DIR =  $(X11_LIB)
+
+
+xintolat_SRCS+=xintolat.c
+
+adt_SRCS+=adt.c
+adt_SRCS+=callback.c
+adt_SRCS+=repaint.c
+adt_SRCS+=event.c
+adt_SRCS+=ut.c
+adt_SRCS+=eca.c
+adt_SRCS+=menu.c
+adt_SRCS+=pix.c
+adt_SRCS+=browserHelp.c
+adt_SRCS+=file.c
+
+PROD_HOST = adt xintolat
+
+RCS_WIN32 += adt.rc
+
+include $(TOP)/configure/RULES
+
+adt.res:../adt.ico
+

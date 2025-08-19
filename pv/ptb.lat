@@ -1,0 +1,44 @@
+SDDS1
+&description text="ADT Lattice File" &end
+&parameter name=ADTFileType fixed_value="ADTLATTICE" type=string &end
+&parameter name=Nsectors fixed_value=1 type=short &end
+&parameter name=Stotal fixed_value=20.180984 type=double &end
+&parameter name=Ring fixed_value=0 type=short &end
+&column name=S type=double &end
+&column name=Length type=double &end
+&column name=SymbolHeight type=short &end
+&column name=Name type=string &end
+&data mode=ascii no_row_counts=1 &end
+  0.000000  0.400000  1 P:ESP
+  1.262346  0.000000  1 PTB:V1
+  3.301706  0.306100 -2 PTB:Q1
+  4.343236  0.000000  0 PTB:PH1
+  4.373236  0.000000  1 PTB:H1
+  4.601706  0.306100  2 PTB:Q2
+  5.643236  0.000000  0 PTB:PV1
+  5.901706  0.306100 -2 PTB:Q3
+  6.943236  0.000000  0 PTB:PH2
+  6.973236  0.000000  1 PTB:H2
+  7.201706  0.306100  2 PTB:Q4
+  8.243236  0.000000  0 PTB:PV2
+  8.273236  0.000000  1 PTB:V2
+  8.501706  0.306100 -2 PTB:Q5
+  9.703748  0.402008  1 PTB:B1
+ 10.443228  0.000000  0 PTB:PH3
+ 10.473228  0.000000  1 PTB:H3
+ 10.701698  0.306100  2 PTB:Q6
+ 11.343228  0.000000  0 PTB:PV3
+ 11.373228  0.000000  1 PTB:V3
+ 11.601698  0.306100 -2 PTB:Q7
+ 12.696068  0.000000  1 PTB:H4
+ 12.924538  0.306100  2 PTB:Q8
+ 13.596068  0.000000  1 PTB:V4
+ 13.626068  0.000000  0 PTB:PV4
+ 13.824538  0.306100 -2 PTB:Q9
+ 14.727588  0.401681  1 PTB:B2
+ 15.259269  0.000000  0 PTB:PH4
+ 16.965712  0.306100  2 PTB:Q10
+ 18.165712  0.306100 -2 PTB:Q11
+ 18.598762  0.000000  0 PTB:PH5
+ 18.858762  0.000000  0 PTB:PV5
+ 19.380984  0.800000  1 PTB:BS

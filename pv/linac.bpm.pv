@@ -1,0 +1,65 @@
+SDDS1
+&description
+  text="ADT PV file for Linac Monitors"
+&end
+&parameter name=ADTFileType fixed_value="ADTPV" type=string &end
+&parameter name=ADTNArrays type=short fixed_value=2 &end
+&parameter name=ADTLatticeFile type=string fixed_value="linac.lat" &end
+!&parameter name=ADTReferenceFile fixed_value="" type=string &end
+&parameter name=ADTBars type=short fixed_value=0 &end
+&parameter name=ADTHeading type=string &end
+&parameter name=ADTUnits type=string &end
+&parameter name=ADTScaleFactor type=double &end
+&parameter name=ADTUnitsPerDiv type=double &end
+&parameter name=ADTCenterVal type=double &end
+&parameter name=ADTZoomArea type=short &end
+&parameter name=ADTLogScale type=short &end
+&parameter name=ADTColor type=string &end
+&column name=ControlName type=string &end
+&column name=ControlType type=string &end
+&column name=ControlMode type=string &end
+&data mode=ascii no_row_counts=1 additional_header_lines=1 &end
+
+! x BPM readings
+LINAC HORIZONTAL BPM'S
+mm
+1.0     ! ScaleFactor
+0.2     ! UnitsPerDiv
+0.0     ! CenterVal
+1       ! ZoomArea
+0       ! LogScale
+Red
+L1:PM1:BPM.XPOS pv RO
+L2:PM1:BPM.XPOS pv RO
+L2:PM2:BPM.XPOS pv RO
+L2:PM3:BPM.XPOS pv RO
+L3:PM1:BPM.XPOS pv RO
+L4:PM1:BPM.XPOS pv RO
+L4:PM2:BPM.XPOS pv RO
+L4:PM3:BPM.XPOS pv RO
+!L5:PM1:BPM.XPOS pv RO (not there)
+L5:PM2:BPM.XPOS pv RO
+L5:PM3:BPM.XPOS pv RO
+L5:PM4:BPM.XPOS pv RO
+
+! y BPM readings
+LINAC Vertical BPM'S
+mm
+1.0     ! ScaleFactor
+0.2     ! UnitsPerDiv
+0.0     ! CenterVal
+1       ! ZoomArea
+0       ! LogScale
+Blue
+L1:PM1:BPM.YPOS pv RO
+L2:PM1:BPM.YPOS pv RO
+L2:PM2:BPM.YPOS pv RO
+L2:PM3:BPM.YPOS pv RO
+L3:PM1:BPM.YPOS pv RO
+L4:PM1:BPM.YPOS pv RO
+L4:PM2:BPM.YPOS pv RO
+L4:PM3:BPM.YPOS pv RO
+!L5:PM1:BPM.YPOS pv RO (not there)
+L5:PM2:BPM.YPOS pv RO
+L5:PM3:BPM.YPOS pv RO
+L5:PM4:BPM.YPOS pv RO

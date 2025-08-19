@@ -1,0 +1,199 @@
+SDDS1
+&description
+  text="ADT PV file for BOOSTER Horizontal and Vertical Monitors"
+&end
+&parameter name=ADTFileType fixed_value="ADTPV" type=string &end
+&parameter name=ADTNArrays type=short fixed_value=2 &end
+&parameter name=ADTNAreas type=short fixed_value=2 &end
+&parameter name=ADTLatticeFile type=string fixed_value="booster.lat" &end
+!&parameter name=ADTReferenceFile fixed_value="" type=string &end
+&parameter name=ADTHeading type=string &end
+&parameter name=ADTUnits type=string &end
+&parameter name=ADTUnitsPerDiv type=double &end
+&parameter name=ADTScaleFactor type=double &end
+&parameter name=ADTCenterVal type=double &end
+!&parameter name=ADTDisplayArea type=short &end
+&parameter name=ADTZoomArea type=short fixed_value=1 &end
+!&parameter name=ADTLogScale type=short &end
+&parameter name=ADTColor type=string &end
+&column name=ControlName type=string &end
+&column name=ControlType type=string &end
+&column name=ControlMode type=string &end
+&column name=StatusName type=string &end
+&data mode=ascii no_row_counts=1 additional_header_lines=1 &end
+
+! x BPM readings
+BOOSTER HORIZONTAL BPM'S
+mm
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+Red
+B1C0P1:ms:x pv RO B1C0P1:ms.XAVS
+B1C0P2:ms:x pv RO B1C0P2:ms.XAVS
+B1C1P1:ms:x pv RO B1C1P1:ms.XAVS
+B1C1P2:ms:x pv RO B1C1P2:ms.XAVS
+B1C2P1:ms:x pv RO B1C2P1:ms.XAVS
+B1C2P2:ms:x pv RO B1C2P2:ms.XAVS
+B1C3P1:ms:x pv RO B1C3P1:ms.XAVS
+B1C3P2:ms:x pv RO B1C3P2:ms.XAVS
+B1C4P1:ms:x pv RO B1C4P1:ms.XAVS
+B1C4P2:ms:x pv RO B1C4P2:ms.XAVS
+B1C5P1:ms:x pv RO B1C5P1:ms.XAVS
+B1C5P2:ms:x pv RO B1C5P2:ms.XAVS
+B1C6P1:ms:x pv RO B1C6P1:ms.XAVS
+B1C6P2:ms:x pv RO B1C6P2:ms.XAVS
+B1C7P1:ms:x pv RO B1C7P1:ms.XAVS
+B1C7P2:ms:x pv RO B1C7P2:ms.XAVS
+B1C8P1:ms:x pv RO B1C8P1:ms.XAVS
+B1C8P2:ms:x pv RO B1C8P2:ms.XAVS
+B1C9P1:ms:x pv RO B1C9P1:ms.XAVS
+B1C9P2:ms:x pv RO B1C9P2:ms.XAVS
+B2C0P1:ms:x pv RO B2C0P1:ms.XAVS
+B2C0P2:ms:x pv RO B2C0P2:ms.XAVS
+B2C1P1:ms:x pv RO B2C1P1:ms.XAVS
+B2C1P2:ms:x pv RO B2C1P2:ms.XAVS
+B2C2P1:ms:x pv RO B2C2P1:ms.XAVS
+B2C2P2:ms:x pv RO B2C2P2:ms.XAVS
+B2C3P1:ms:x pv RO B2C3P1:ms.XAVS
+B2C3P2:ms:x pv RO B2C3P2:ms.XAVS
+B2C4P1:ms:x pv RO B2C4P1:ms.XAVS
+B2C4P2:ms:x pv RO B2C4P2:ms.XAVS
+B2C5P1:ms:x pv RO B2C5P1:ms.XAVS
+B2C5P2:ms:x pv RO B2C5P2:ms.XAVS
+B2C6P1:ms:x pv RO B2C6P1:ms.XAVS
+B2C6P2:ms:x pv RO B2C6P2:ms.XAVS
+B2C7P1:ms:x pv RO B2C7P1:ms.XAVS
+B2C7P2:ms:x pv RO B2C7P2:ms.XAVS
+B2C8P1:ms:x pv RO B2C8P1:ms.XAVS
+B2C8P2:ms:x pv RO B2C8P2:ms.XAVS
+B2C9P1:ms:x pv RO B2C9P1:ms.XAVS
+B2C9P2:ms:x pv RO B2C9P2:ms.XAVS
+B3C0P1:ms:x pv RO B3C0P1:ms.XAVS
+B3C0P2:ms:x pv RO B3C0P2:ms.XAVS
+B3C1P1:ms:x pv RO B3C1P1:ms.XAVS
+B3C1P2:ms:x pv RO B3C1P2:ms.XAVS
+B3C2P1:ms:x pv RO B3C2P1:ms.XAVS
+B3C2P2:ms:x pv RO B3C2P2:ms.XAVS
+B3C3P1:ms:x pv RO B3C3P1:ms.XAVS
+B3C3P2:ms:x pv RO B3C3P2:ms.XAVS
+B3C4P1:ms:x pv RO B3C4P1:ms.XAVS
+B3C4P2:ms:x pv RO B3C4P2:ms.XAVS
+B3C5P1:ms:x pv RO B3C5P1:ms.XAVS
+B3C5P2:ms:x pv RO B3C5P2:ms.XAVS
+B3C6P1:ms:x pv RO B3C6P1:ms.XAVS
+B3C6P2:ms:x pv RO B3C6P2:ms.XAVS
+B3C7P1:ms:x pv RO B3C7P1:ms.XAVS
+B3C7P2:ms:x pv RO B3C7P2:ms.XAVS
+B3C8P1:ms:x pv RO B3C8P1:ms.XAVS
+B3C8P2:ms:x pv RO B3C8P2:ms.XAVS
+B3C9P1:ms:x pv RO B3C9P1:ms.XAVS
+B3C9P2:ms:x pv RO B3C9P2:ms.XAVS
+B4C0P1:ms:x pv RO B4C0P1:ms.XAVS
+B4C0P2:ms:x pv RO B4C0P2:ms.XAVS
+B4C1P1:ms:x pv RO B4C1P1:ms.XAVS
+B4C1P2:ms:x pv RO B4C1P2:ms.XAVS
+B4C2P1:ms:x pv RO B4C2P1:ms.XAVS
+B4C2P2:ms:x pv RO B4C2P2:ms.XAVS
+B4C3P1:ms:x pv RO B4C3P1:ms.XAVS
+B4C3P2:ms:x pv RO B4C3P2:ms.XAVS
+B4C4P1:ms:x pv RO B4C4P1:ms.XAVS
+B4C4P2:ms:x pv RO B4C4P2:ms.XAVS
+B4C5P1:ms:x pv RO B4C5P1:ms.XAVS
+B4C5P2:ms:x pv RO B4C5P2:ms.XAVS
+B4C6P1:ms:x pv RO B4C6P1:ms.XAVS
+B4C6P2:ms:x pv RO B4C6P2:ms.XAVS
+B4C7P1:ms:x pv RO B4C7P1:ms.XAVS
+B4C7P2:ms:x pv RO B4C7P2:ms.XAVS
+B4C8P1:ms:x pv RO B4C8P1:ms.XAVS
+B4C8P2:ms:x pv RO B4C8P2:ms.XAVS
+B4C9P1:ms:x pv RO B4C9P1:ms.XAVS
+B4C9P2:ms:x pv RO B4C9P2:ms.XAVS
+
+! y BPM readings
+BOOSTER VERTICAL BPM'S
+mm
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+Blue
+B1C0P1:ms:y pv RO B1C0P1:ms.YAVS
+B1C0P2:ms:y pv RO B1C0P2:ms.YAVS
+B1C1P1:ms:y pv RO B1C1P1:ms.YAVS
+B1C1P2:ms:y pv RO B1C1P2:ms.YAVS
+B1C2P1:ms:y pv RO B1C2P1:ms.YAVS
+B1C2P2:ms:y pv RO B1C2P2:ms.YAVS
+B1C3P1:ms:y pv RO B1C3P1:ms.YAVS
+B1C3P2:ms:y pv RO B1C3P2:ms.YAVS
+B1C4P1:ms:y pv RO B1C4P1:ms.YAVS
+B1C4P2:ms:y pv RO B1C4P2:ms.YAVS
+B1C5P1:ms:y pv RO B1C5P1:ms.YAVS
+B1C5P2:ms:y pv RO B1C5P2:ms.YAVS
+B1C6P1:ms:y pv RO B1C6P1:ms.YAVS
+B1C6P2:ms:y pv RO B1C6P2:ms.YAVS
+B1C7P1:ms:y pv RO B1C7P1:ms.YAVS
+B1C7P2:ms:y pv RO B1C7P2:ms.YAVS
+B1C8P1:ms:y pv RO B1C8P1:ms.YAVS
+B1C8P2:ms:y pv RO B1C8P2:ms.YAVS
+B1C9P1:ms:y pv RO B1C9P1:ms.YAVS
+B1C9P2:ms:y pv RO B1C9P2:ms.YAVS
+B2C0P1:ms:y pv RO B2C0P1:ms.YAVS
+B2C0P2:ms:y pv RO B2C0P2:ms.YAVS
+B2C1P1:ms:y pv RO B2C1P1:ms.YAVS
+B2C1P2:ms:y pv RO B2C1P2:ms.YAVS
+B2C2P1:ms:y pv RO B2C2P1:ms.YAVS
+B2C2P2:ms:y pv RO B2C2P2:ms.YAVS
+B2C3P1:ms:y pv RO B2C3P1:ms.YAVS
+B2C3P2:ms:y pv RO B2C3P2:ms.YAVS
+B2C4P1:ms:y pv RO B2C4P1:ms.YAVS
+B2C4P2:ms:y pv RO B2C4P2:ms.YAVS
+B2C5P1:ms:y pv RO B2C5P1:ms.YAVS
+B2C5P2:ms:y pv RO B2C5P2:ms.YAVS
+B2C6P1:ms:y pv RO B2C6P1:ms.YAVS
+B2C6P2:ms:y pv RO B2C6P2:ms.YAVS
+B2C7P1:ms:y pv RO B2C7P1:ms.YAVS
+B2C7P2:ms:y pv RO B2C7P2:ms.YAVS
+B2C8P1:ms:y pv RO B2C8P1:ms.YAVS
+B2C8P2:ms:y pv RO B2C8P2:ms.YAVS
+B2C9P1:ms:y pv RO B2C9P1:ms.YAVS
+B2C9P2:ms:y pv RO B2C9P2:ms.YAVS
+B3C0P1:ms:y pv RO B3C0P1:ms.YAVS
+B3C0P2:ms:y pv RO B3C0P2:ms.YAVS
+B3C1P1:ms:y pv RO B3C1P1:ms.YAVS
+B3C1P2:ms:y pv RO B3C1P2:ms.YAVS
+B3C2P1:ms:y pv RO B3C2P1:ms.YAVS
+B3C2P2:ms:y pv RO B3C2P2:ms.YAVS
+B3C3P1:ms:y pv RO B3C3P1:ms.YAVS
+B3C3P2:ms:y pv RO B3C3P2:ms.YAVS
+B3C4P1:ms:y pv RO B3C4P1:ms.YAVS
+B3C4P2:ms:y pv RO B3C4P2:ms.YAVS
+B3C5P1:ms:y pv RO B3C5P1:ms.YAVS
+B3C5P2:ms:y pv RO B3C5P2:ms.YAVS
+B3C6P1:ms:y pv RO B3C6P1:ms.YAVS
+B3C6P2:ms:y pv RO B3C6P2:ms.YAVS
+B3C7P1:ms:y pv RO B3C7P1:ms.YAVS
+B3C7P2:ms:y pv RO B3C7P2:ms.YAVS
+B3C8P1:ms:y pv RO B3C8P1:ms.YAVS
+B3C8P2:ms:y pv RO B3C8P2:ms.YAVS
+B3C9P1:ms:y pv RO B3C9P1:ms.YAVS
+B3C9P2:ms:y pv RO B3C9P2:ms.YAVS
+B4C0P1:ms:y pv RO B4C0P1:ms.YAVS
+B4C0P2:ms:y pv RO B4C0P2:ms.YAVS
+B4C1P1:ms:y pv RO B4C1P1:ms.YAVS
+B4C1P2:ms:y pv RO B4C1P2:ms.YAVS
+B4C2P1:ms:y pv RO B4C2P1:ms.YAVS
+B4C2P2:ms:y pv RO B4C2P2:ms.YAVS
+B4C3P1:ms:y pv RO B4C3P1:ms.YAVS
+B4C3P2:ms:y pv RO B4C3P2:ms.YAVS
+B4C4P1:ms:y pv RO B4C4P1:ms.YAVS
+B4C4P2:ms:y pv RO B4C4P2:ms.YAVS
+B4C5P1:ms:y pv RO B4C5P1:ms.YAVS
+B4C5P2:ms:y pv RO B4C5P2:ms.YAVS
+B4C6P1:ms:y pv RO B4C6P1:ms.YAVS
+B4C6P2:ms:y pv RO B4C6P2:ms.YAVS
+B4C7P1:ms:y pv RO B4C7P1:ms.YAVS
+B4C7P2:ms:y pv RO B4C7P2:ms.YAVS
+B4C8P1:ms:y pv RO B4C8P1:ms.YAVS
+B4C8P2:ms:y pv RO B4C8P2:ms.YAVS
+B4C9P1:ms:y pv RO B4C9P1:ms.YAVS
+B4C9P2:ms:y pv RO B4C9P2:ms.YAVS

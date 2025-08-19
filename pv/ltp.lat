@@ -1,0 +1,46 @@
+SDDS1
+&description text="ADT Lattice File" &end
+&parameter name=ADTFileType fixed_value="ADTLATTICE" type=string &end
+&parameter name=Nsectors fixed_value=1 type=short &end
+&parameter name=Stotal fixed_value=23.511066 type=double &end
+&parameter name=Ring fixed_value=0 type=short &end
+&column name=S type=double &end
+&column name=Length type=double &end
+&column name=SymbolHeight type=short &end
+&column name=Name type=string &end
+&data mode=ascii no_row_counts=1 &end
+  0.023000  0.000000  1 LTP:V5
+  0.023000  0.000000  1 LTP:H5
+  1.990000  0.300000 -2 LTP:Q10
+  2.443220  0.000000  1 LTP:V4
+  4.650000  0.300000  2 LTP:Q9
+  5.103220  0.000000  1 LTP:H4
+  7.549330  0.300000  2 LTP:Q8
+  9.798890  0.000000  0 LTP:PV4
+  9.989330  0.300000 -2 LTP:Q7
+ 10.442550  0.000000  1 LTP:V3
+ 11.934880  0.000000  0 LTP:FL3
+ 12.135870  0.000000  0 LTP:PH4
+ 12.326310  0.300000  2 LTP:Q6
+ 12.779530  0.000000  1 LTP:H3
+ 13.406310  0.400000  1 LTP:B1
+ 14.515730  0.000000  0 LTP:PV3
+ 14.706310  0.300000 -2 LTP:Q5
+ 15.159530  0.000000  1 LTP:V2
+ 15.815870  0.000000  0 LTP:PH3
+ 16.006310  0.300000  2 LTP:Q4
+ 16.459530  0.000000  1 LTP:H2
+ 17.115870  0.000000  0 LTP:PV2
+ 17.306310  0.300000 -2 LTP:Q3
+ 17.759530  0.000000  1 LTP:V1
+ 18.214880  0.000000  0 LTP:FL2
+ 18.415870  0.000000  0 LTP:PH2
+ 18.606310  0.300000  2 LTP:Q2
+ 19.059530  0.000000  1 LTP:H1
+ 19.406310  0.000000  0 LTP:CM1
+ 19.906310  0.300000 -2 LTP:Q1
+ 21.554990  0.000000  0 LTP:FL1
+ 22.281190  0.000000  0 LTP:PH1
+ 22.433590  0.000000  0 LTP:PV1
+ 23.111066  0.400000  1 LTP:SP
+ 23.511066  0.000000  0 LTP:END

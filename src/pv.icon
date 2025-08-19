@@ -1,0 +1,4 @@
+#define pv_width 3
+#define pv_height 3
+static unsigned char pv_bits[] = {
+   0x07, 0x07, 0x07};

@@ -1,0 +1,111 @@
+SDDS1
+&description
+  text="Orbitscreen PV file for SR Horizontal and Vertical Monitors (Sector 40,1-4)"
+&end
+&parameter name=OSFileType fixed_value="ORBITSCREENPV" type=string &end
+&parameter name=OSHeading1 fixed_value="SR HORIZONTAL BPM'S" type=string &end
+&parameter name=OSHeading2 fixed_value="SR VERTICAL BPM'S" type=string &end
+&parameter name=OSScaleFactor1 fixed_value=1.0 units="mm" type=double &end
+&parameter name=OSScaleFactor2 fixed_value=1.0 units="mm" type=double &end
+&parameter name=OSScale1 fixed_value=5.0 type=double &end
+&parameter name=OSScale2 fixed_value=5.0 type=double &end
+&parameter name=OSLatticeFile fixed_value="sr.short.lat" type=string &end
+&column name=ControlName type=string &end
+&column name=ControlType type=string &end
+&column name=ControlMode type=string &end
+&column name=StatusName type=string &end
+&data mode=ascii no_row_counts=1 additional_header_lines=1 &end
+
+! x BPM readings
+S40A:P1:ms:x pv RO S40A:P1:ms.XAVS
+S40A:P2:ms:x pv RO S40A:P2:ms.XAVS
+S40A:P3:ms:x pv RO S40A:P3:ms.XAVS
+S40A:P4:ms:x pv RO S40A:P4:ms.XAVS
+S40B:P5:ms:x pv RO S40B:P5:ms.XAVS
+S40B:P4:ms:x pv RO S40B:P4:ms.XAVS
+S40B:P3:ms:x pv RO S40B:P3:ms.XAVS
+S40B:P2:ms:x pv RO S40B:P2:ms.XAVS
+S40B:P1:ms:x pv RO S40B:P1:ms.XAVS
+S1A:P1:ms:x pv RO S1A:P1:ms.XAVS
+S1A:P2:ms:x pv RO S1A:P2:ms.XAVS
+S1A:P3:ms:x pv RO S1A:P3:ms.XAVS
+S1A:P4:ms:x pv RO S1A:P4:ms.XAVS
+S1B:P5:ms:x pv RO S1B:P5:ms.XAVS
+S1B:P4:ms:x pv RO S1B:P4:ms.XAVS
+S1B:P3:ms:x pv RO S1B:P3:ms.XAVS
+S1B:P2:ms:x pv RO S1B:P2:ms.XAVS
+S1B:P1:ms:x pv RO S1B:P1:ms.XAVS
+S2A:P1:ms:x pv RO S2A:P1:ms.XAVS
+S2A:P2:ms:x pv RO S2A:P2:ms.XAVS
+S2A:P3:ms:x pv RO S2A:P3:ms.XAVS
+S2A:P4:ms:x pv RO S2A:P4:ms.XAVS
+S2B:P5:ms:x pv RO S2B:P5:ms.XAVS
+S2B:P4:ms:x pv RO S2B:P4:ms.XAVS
+S2B:P3:ms:x pv RO S2B:P3:ms.XAVS
+S2B:P2:ms:x pv RO S2B:P2:ms.XAVS
+S2B:P1:ms:x pv RO S1B:P1:ms.XAVS
+S3A:P1:ms:x pv RO S3A:P1:ms.XAVS
+S3A:P2:ms:x pv RO S3A:P2:ms.XAVS
+S3A:P3:ms:x pv RO S3A:P3:ms.XAVS
+S3A:P4:ms:x pv RO S3A:P4:ms.XAVS
+S3B:P5:ms:x pv RO S3B:P5:ms.XAVS
+S3B:P4:ms:x pv RO S3B:P4:ms.XAVS
+S3B:P3:ms:x pv RO S3B:P3:ms.XAVS
+S3B:P2:ms:x pv RO S3B:P2:ms.XAVS
+S3B:P1:ms:x pv RO S3B:P1:ms.XAVS
+S4A:P1:ms:x pv RO S4A:P1:ms.XAVS
+S4A:P2:ms:x pv RO S4A:P2:ms.XAVS
+S4A:P3:ms:x pv RO S4A:P3:ms.XAVS
+S4A:P4:ms:x pv RO S4A:P4:ms.XAVS
+S4B:P5:ms:x pv RO S4B:P5:ms.XAVS
+S4B:P4:ms:x pv RO S4B:P4:ms.XAVS
+S4B:P3:ms:x pv RO S4B:P3:ms.XAVS
+S4B:P2:ms:x pv RO S4B:P2:ms.XAVS
+S4B:P1:ms:x pv RO S4B:P1:ms.XAVS
+
+! y BPM readings
+S40A:P1:ms:y pv RO S40A:P1:ms.YAVS
+S40A:P2:ms:y pv RO S40A:P2:ms.YAVS
+S40A:P3:ms:y pv RO S40A:P3:ms.YAVS
+S40A:P4:ms:y pv RO S40A:P4:ms.YAVS
+S40B:P5:ms:y pv RO S40B:P5:ms.YAVS
+S40B:P4:ms:y pv RO S40B:P4:ms.YAVS
+S40B:P3:ms:y pv RO S40B:P3:ms.YAVS
+S40B:P2:ms:y pv RO S40B:P2:ms.YAVS
+S40B:P1:ms:y pv RO S40B:P1:ms.YAVS
+S1A:P1:ms:y pv RO S1A:P1:ms.YAVS
+S1A:P2:ms:y pv RO S1A:P2:ms.YAVS
+S1A:P3:ms:y pv RO S1A:P3:ms.YAVS
+S1A:P4:ms:y pv RO S1A:P4:ms.YAVS
+S1B:P5:ms:y pv RO S1B:P5:ms.YAVS
+S1B:P4:ms:y pv RO S1B:P4:ms.YAVS
+S1B:P3:ms:y pv RO S1B:P3:ms.YAVS
+S1B:P2:ms:y pv RO S1B:P2:ms.YAVS
+S1B:P1:ms:y pv RO S1B:P1:ms.YAVS
+S2A:P1:ms:y pv RO S2A:P1:ms.YAVS
+S2A:P2:ms:y pv RO S2A:P2:ms.YAVS
+S2A:P3:ms:y pv RO S2A:P3:ms.YAVS
+S2A:P4:ms:y pv RO S2A:P4:ms.YAVS
+S2B:P5:ms:y pv RO S2B:P5:ms.YAVS
+S2B:P4:ms:y pv RO S2B:P4:ms.YAVS
+S2B:P3:ms:y pv RO S2B:P3:ms.YAVS
+S2B:P2:ms:y pv RO S2B:P2:ms.YAVS
+S2B:P1:ms:y pv RO S1B:P1:ms.YAVS
+S3A:P1:ms:y pv RO S3A:P1:ms.YAVS
+S3A:P2:ms:y pv RO S3A:P2:ms.YAVS
+S3A:P3:ms:y pv RO S3A:P3:ms.YAVS
+S3A:P4:ms:y pv RO S3A:P4:ms.YAVS
+S3B:P5:ms:y pv RO S3B:P5:ms.YAVS
+S3B:P4:ms:y pv RO S3B:P4:ms.YAVS
+S3B:P3:ms:y pv RO S3B:P3:ms.YAVS
+S3B:P2:ms:y pv RO S3B:P2:ms.YAVS
+S3B:P1:ms:y pv RO S3B:P1:ms.YAVS
+S4A:P1:ms:y pv RO S4A:P1:ms.YAVS
+S4A:P2:ms:y pv RO S4A:P2:ms.YAVS
+S4A:P3:ms:y pv RO S4A:P3:ms.YAVS
+S4A:P4:ms:y pv RO S4A:P4:ms.YAVS
+S4B:P5:ms:y pv RO S4B:P5:ms.YAVS
+S4B:P4:ms:y pv RO S4B:P4:ms.YAVS
+S4B:P3:ms:y pv RO S4B:P3:ms.YAVS
+S4B:P2:ms:y pv RO S4B:P2:ms.YAVS
+S4B:P1:ms:y pv RO S4B:P1:ms.YAVS

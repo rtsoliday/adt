@@ -1,0 +1,1172 @@
+<html><head><!-- This document was created from RTF source by rtftohtml version
+2.6 --><title>ADT Help</title></head><body><p>
+<p>
+<p>
+<p>
+
+<h1>
+Array Display Tool ADT<br>
+Reference Manual<br>
+</h1>
+<p>
+<p>
+<p>
+<p>
+<p>
+<p>
+
+<h2>
+	Kenneth Evans, Jr.<br>
+	<br>
+	Version 1.2<br>
+	December 1995</h2>
+<h1><img src="aps.icon">ADT <a name="contents">Help</a></h1>
+<h1>
+Contents</h1>
+<menu>
+<li>
+<a href="#overview">Overview</a>
+<li>
+<a href="#new">New
+Features</a>
+<li>
+<a href="#cmdline">Getting
+Started</a>
+<li>
+<a href="#displayareas">Display
+Areas</a>
+<li>
+<a href="#zoomarea">Zoom
+Area</a>
+<li>
+<a href="#mouse">Mouse
+Operations</a>
+<li>
+<a href="#filemenu">File
+Menu</a>
+<li>
+<a href="#optionsmenu">Options
+Menu</a>
+<li>
+<a href="#viewmenu">View
+Menu</a>
+<li>
+<a href="#clearmenu">Clear
+Menu</a>
+<li>
+<a href="#install">Installation</a>
+<li>
+<a href="#config">Configuration</a>
+<li>
+<a href="#pvfiles">PV
+Files</a>
+<li>
+<a href="#latticefiles">Lattice
+Files</a>
+<li>
+<a href="#snapshotfiles">Snapshot
+Files</a>
+<li>
+<a href="#reference">Reference
+Files and Referencing</a>
+<li>
+<a href="#appdef">Application-Defaults
+File</a>
+<li>
+<a href="#status">Status
+Indicators</a>
+<li>
+<a href="#color">Color
+Code</a>
+<li>
+<a href="#xorbit">Xorbit
+Simulation Mode</a></menu>
+
+<h1>
+<a name="overview">Overview
+</a></h1>
+	Array Display Tool (ADT) is a Motif<a href="#fn0">[1]</a> program to display
+arrays of process variables from the Advanced Photon Source control system.  A
+typical use is to display the horizontal and vertical monitor readings.  A
+picture of the ADT interface is <a href="adt.gif">here</a>.<p>
+<p>
+	The screen layout, apart from the menu bar, consists of two types of graphic
+areas in which the values for the arrays of process variables are shown: 
+<a href="#displayareas">Display</a>
+areas, which display one or more arrays as a function of index, and a 
+<a href="#zoomarea">zoom</a>
+area.  In the zoom area specified arrays only are displayed as a function of
+lattice position along with symbols for the major elements of the lattice.
+There can be several display areas, but at most one zoom area.  When the screen
+is resized these areas change size proportionally.<p>
+<p>
+	There are a number of options in the 
+<a href="#viewmenu">View
+Menu</a> to change the way the values are displayed.  It is also possible via
+the 
+<a href="#optionsmenu">Options
+Menu</a> to:<p>
+
+<menu>
+<li>Store the current values internally.
+<li>Store the values from a snapshot file internally.
+<li>Display one of the stored sets of values along with the current values.
+<li>Display the difference of the current values with one of the stored sets of
+values.
+<li>Write the current values to a snapshot file.</menu>
+<p>
+There are several (currently 5) slots in which you can store values internally.
+In addition you can display the values with specified 
+<a href="#reference">reference</a>
+values subtracted.<p>
+<p>
+	New values are sent to the program anytime the process variables change
+outside of their dead band (as specified in the control system record for that
+process variable).  If the dead band is chosen appropriately, this should
+result in less traffic over the control network than if all of the values were
+polled at fixed intervals. The current values that have been received are
+displayed whenever the screen updates.  It is also possible to manually update
+the variables via the 
+<a href="#optionsmenu">Options/Epics/Rescan</a>
+menu.<p>
+<p>
+	The program continuously updates and displays the standard deviation, average,
+and maximum absolute values for each array and will show the envelope of recent
+values if desired.  The time between updates can be changed via the 
+<a href="#viewmenu">View
+Menu</a> or may be specified in the 
+<a href="#pvfiles">PV
+file</a>.  Whether the statistics are for the current values or accumulated
+over a period of time is controlled by the Accumulated Statistics button in the 
+<a href="#optionsmenu">Options
+Menu</a>.<p>
+<p>
+	There is a 
+<a href="#config">configuration
+file</a> that is needed to get ADT running.  Most of the features of the screen
+layout, including what process variables are shown in what display areas, are
+determined by a 
+<a href="#pvfiles">PV
+file</a>.  The contents of this file determine such things as curve color,
+units, and scaling.  Another relevant file is a  
+<a href="#latticefiles">lattice
+file</a>, which specifies the symbols and longitudinal lattice positions of the
+elements in the lattice.  Sets of values can be saved and restored via 
+<a href="#snapshotfiles">snapshot
+files.</a><p>
+<p>
+	Most of the available options can be discovered intuitively by looking through
+the menus.  This manual is primary for reference and is not a tutorial.<p>
+
+<h1>
+New <a name="new">Features
+</a></h1>
+	The following features are new in ADT, compared to its predecessor,
+Orbitscreen.<p>
+
+<menu>
+<li>There may be an arbitrary number of 
+<a href="#displayareas">display
+areas</a>, practically about 1-4.
+<li>More than one array may be displayed in a 
+<a href="#displayareas">display
+area</a>, making comparisons easier.
+<li>The 
+<a href="#zoomarea">zoom
+area</a> and which 
+<a href="#pvfiles">arrays</a>
+appear in the zoom area are arbitrary.
+<li>All the 
+<a href="#displayareas">display
+areas</a> scale proportionally when the screen is resized.
+<li>The scale button is replaced by a 
+<a href="#displayareas">units
+per division</a> button, more like an oscilloscope.
+<li>The 
+<a href="#displayareas">center
+value</a> of a display area may be specified.
+<li>A file of 
+<a href="#reference">reference</a>
+values (such as BPM offsets) may be specified and turned on/off.
+<li>Clicking the 
+<a href="#mouse">right
+button</a> in a display area clears the Max/Min envelope display.
+<li>An array may be displayed with a 
+<a href="#pvfiles">log
+scale</a> (appropriate for vacuum readings, for example).
+<li>ADT may be started from the 
+<a href="#cmdline">command
+line</a> with a specified PV file.
+<li>The home directory may be specified on the 
+<a href="#cmdline">command
+line</a>.
+<li>Most of the view options may be specified in the 
+<a href="#pvfiles">PV
+file</a>.
+<li>
+<a href="#snapshotfiles">Snapshot
+files</a> retain the paging by array so they are more easily used with SDDS
+tools.
+<li>The 
+<a href="#filemenu">Load
+menu</a> has submenus.
+<li>The statistics (SDEV, AVG, and MAX) can be accumulated over the
+maximin/minimum history period.  See Average Statistics under the 
+<a href="#optionsmenu">Options
+Menu
+<a name="n2"></a>.
+<li>The 
+<a href="#appdef">application
+defaults</a> file, ControlApp, is no longer needed.</a></menu>
+
+<h1>
+Getting <a name="cmdline">Started
+</a></h1>
+	In order for ADT to run properly, it needs to find the <b>adtrc</b> file.  (It
+is possible to run ADT without the <b>adtrc</b> file, but it is not suggested.)
+This file contains the 
+<a href="#filemenu">File/Load
+menu</a> options and the locations of other files that ADT needs.  More about
+the <b>adtrc </b>file may be found under 
+<a href="#config">configuration</a>.<p>
+<p>
+	The command line for ADT is of the form:<p>
+<p>
+	<b>adt</b> [<b>Standard X O</b>ptions] [-x] [-f <i>pvfilename</i><b>] [</b>-a
+<i>adthome</i><b>]</b><p>
+<p>
+It accepts any of the standard X-Window options, such as <b>-display
+machine:0</b>.  The other options are:<p>
+
+<dl>
+<dt>-<b>a</b> <i>adthome</i>
+<dd>Specify the directory for the configuration file to be <i>adthome</i>.
+<dt>-<b>f</b> <i>pvfilename</i>
+<dd>Load the PV file, <i>pvfilename</i>, at startup, bypassing the Load menu.<b>
+<dt>-x</b>
+<dd>	Use Xorbit Simulation Mode.</dl><p>
+Both <i>adthome</i> and <i>pvfile</i> must include a path if they are not in
+the directory from which adt is started.<p>
+
+<h1>
+Display <a name="displayareas">Areas
+</a></h1>
+	In the display areas the values of the process variables are displayed in
+graphical form with uniform horizontal spacing between the points.  Display
+options, such as whether the values are displayed as a line plot, as an impulse
+plot, or as markers only, are determined by settings that can be made in the 
+<a href="#viewmenu">View
+menu</a>.  There are 
+<a href="#mouse">mouse
+operations</a> for displaying the numerical values of the three elements
+closest to the mouse cursor and moving the zoom window so the element closest
+to the mouse cursor is in the center, as well as for clearing the Max/Min
+envelope (the region between the maximum and minimum values achieved for each
+process variable since the last reset).  There are options in the 
+<a href="#viewmenu">View
+menu</a> to show or not show the Max/Min envelope.  The Max/Min envelope can
+also be cleared from the 
+<a href="#optionsmenu">Options
+menu</a>.  Clearing the Max/Min envelope also clears the accumulated
+statistics.<p>
+<p>
+	The units per division of the display area can be changed by a control above
+it, as can the center value.  There are also arrow buttons to change the center
+value by one unit per division.  The starting units per division, center
+values, and a factor by which to multiply the raw data to get the desired units
+are set in the 
+<a href="#pvfiles">PV
+file</a>, which also determines which process variables are displayed and the
+heading and units.<p>
+<p>
+	The standard deviation, average, and peak absolute values are shown and
+updated when the values are updated. (The standard deviation defined with n
+rather than n-1 is used since the whole population is known.)  The peak
+absolute value includes the sign of the value that was largest.  The update
+time interval can be changed in the 
+<a href="#viewmenu">View/Timing</a>
+menu.  If a log scale is used, the values displayed are the logirithms (base
+10) of the actual values.<p>
+
+<h1>
+Zoom <a name="zoomarea">Area
+</a></h1>
+	Values for arrays are shown in their true relative lattice positions in the
+zoom window, along with symbols representing the lattice elements.  Only those
+arrays so designated in the 
+<a href="#pvfiles">PV
+file</a> are shown in the zoom window.  The color for each array is the same as
+is used in its display area and may be specified in the PV file.  There are 
+<a href="#mouse">mouse
+operations</a> that scroll the zoom window.  The zoom area can also be scrolled
+to the position of a desired element by clicking on that element in the 
+<a href="#displayareas">display
+areas</a>.<p>
+<p>
+	The units per division and the center value of the zoom window can be changed
+by the controls above it the same as for the display areas. The default units
+per division is the largest of those specified in the 
+<a href="#pvfiles">PV
+file</a> and the default center value is the average.  The length of the
+interval of the lattice shown in the zoom area an be changed via the box
+labeled <b>Interval:</b>.  The sector shown in the box labeled <b>Sector:</b>
+is the sector that is at the center of the display area and can be varied by
+typing a new number or using the arrow buttons.  In addition, numbers
+designating the sectors and a mark identifying the center of the display area
+are displayed in the zoom area to help identify the sectors and the midpoint
+for mouse scrolling.<p>
+<p>
+	The zoom area can be turned off entirely, and it does not appear if the
+process variables cannot be matched with the lattice elements in the 
+<a href="#latticefiles">lattice
+file</a> or if no arrays are specified to appear in the zoom area.<p>
+
+<h1>
+Mouse <a name="mouse">Operations
+</a></h1>
+<h2>
+	In the display areas:</h2>
+
+<dl>
+<dt>Button 1:
+<dd>Pushing and holding Button 1 brings up a dialog box with the numerical
+values of the three elements closest to the mouse cursor.  There is an arrow
+next to the one that is closest to where the mouse was clicked.  The dialog box
+goes away when you release the mouse button within the display area.  If you
+want the box to stay up, drag the mouse cursor off the display area before
+releasing it.</dl>
+<dl>
+<dt>Button 2:
+<dd>Pushing Button 2 moves the element closest to the mouse cursor to the
+center of the zoom area.  If there is more than one array in the display area,
+the element corresponding to the first array in that display area is used.
+<dt>
+<dt>Button 3:
+<dd>Pushing Button 3 in any display area resets the Max/Min envelope in all
+areas.</dl>
+<h2>
+	In the zoom area:</h2>
+
+<dl>
+<dt>Button 2:
+<dd>Pushing Button 2 moves the point under the mouse cursor to the center of
+the zoom area.  (Similarly to what Button 2 does in the upper two display
+areas.)</dl>
+<dl>
+<dt>Button 3:
+<dd>Pushing and holding Button 3 scrolls the zoom area horizontally.  The
+scroll speed is proportional to the distance of the mouse cursor from the
+center of the zoom area.  You can scroll either direction, depending on which
+side of the center you hold the mouse cursor.</dl>
+<h1>
+File <a name="filemenu">Menu
+</a></h1>
+<h2>
+Load</h2>
+	The Load button brings up a menu with submenus of predefined screen layouts
+that may be loaded into the display.  Each screen layout corresponds to a 
+<a href="#pvfiles">PV
+file</a> and the associated 
+<a href="#latticefiles">lattice
+file</a>.  As soon as the screen layout is loaded, monitoring starts.  The
+screen layouts on the menu should be the most commonly used ones.  If you wish
+to specify another layout, you may pick the menu item labeled <b>Custom</b>.
+In that case, a file selection dialog box to pick the PV file name will appear.
+The items that appear in the menu are customizable and are specified in the 
+<a href="#config">configuration
+file</a>.  A specified PV file may also be loaded via the 
+<a href="#cmdline">command
+line</a>.<p>
+
+<h2>
+Read Reference</h2>
+	The Read Reference button brings up a file selection dialog box to allow you
+to pick a reference snapshot file containing 
+<a href="#reference">reference</a>
+data.<p>
+
+<h2>
+Read Snapshot</h2>
+	The Read Snapshot button brings up a menu of possible slots in which to store
+data from a snapshot file.  After choosing the slot from the menu, there will
+be a file selection dialog box to allow you to pick the snapshot file
+containing the data.  The data stored in the slot can then be used for
+displaying or differencing with the current data.  The snapshot file must
+contain the same arrays with the same elements as the PV file specifying the
+current screen layout, or it will be rejected.<p>
+
+<h2>
+Write</h2>
+	The Write button allows you to store either the current data or the data saved
+in one of the slots in a snapshot file.  It brings up a menu which includes the
+current data and the possible slots.  After choosing the current data or the
+desired slot, there will be a file selection dialog box to allow you to pick
+the snapshot file into which to write the data.<p>
+
+<h2>
+Plot</h2>
+	The Plot button brings up an SDDS plot of either the current data or the data
+saved in one of the slots.<p>
+
+<h2>
+Status</h2>
+	The Status button brings up a dialog box with information about the screen
+layout, the accumulated statistics, and the data loaded into slots.<p>
+
+<h2>
+Quit</h2>
+	The Quit button closes any Channel Access connection and terminates ADT.<p>
+
+<h1>
+Options <a name="optionsmenu">Menu
+</a></h1>
+
+<h2>
+EPICS</h2>
+	Normally, using 
+<a href="#filemenu">File/Load</a>
+is sufficient to perform the required EPICS procedures.  This item provides
+more control over EPICS.  The <b>Start</b> button will initialize EPICS if it
+is not initialized and start it with the current PV file.  If EPICS is stopped,
+the <b>Start</b> button will start it and rescan the process variables.
+Initialized means connections have been established with all the process
+variables.  Started means it is initialized, is receiving messages whenever
+those values change outside of their dead bands, and is updating the display.
+When it is started, the <b>Start</b> button changes to a <b>Stop</b> button.
+Consequently, this button also tells you what state it is in.  The <b>Stop</b>
+button leaves EPICS initialized but not receiving messages and not updating the
+display.  You can play with the existing data.  The <b>Exit</b> button stops
+EPICS and closes the connections, so it is no longer initialized.  The
+<b>Reinitialize</b> button is equivalent to <b>Exit</b> followed by
+<b>Start</b>.  The <b>Rescan</b> button causes EPICS to explicitly update all
+the values whether they have changed out of the dead band or not.  It insures
+the readings are current.<p>
+
+<h2>
+Store</h2>
+	The Store button allows you to store the current values in one of the
+available slots.  The status of what is stored in the slots can be displayed
+with the 
+<a href="#filemenu">File/Status</a>
+button.<p>
+
+<h2>
+Display</h2>
+	The Display button allows you to display the current values from one of the
+available slots in addition to the current values.  They will be drawn in the
+stored data 
+<a href="#color">color</a>.
+ This capability allows you to compare the current values, which are being
+updated, with some other set of values.  <b>Off</b> turns off the display of
+these other values.  The status of what is stored in the slots can be displayed
+with the 
+<a href="#filemenu">File/Status</a>
+button.<p>
+
+<h2>
+Difference</h2>
+	The Difference button allows you to display the difference of the current
+values and the values in one of the available slots.  This capability allows
+you to see the changes in the current values from some other set of values.
+<b>Off</b> turns off the differencing.  The center value is reset to zero for
+all display areas when differencing is on and reset to the former values when
+it is turned off.  The status of what is stored in the slots can be displayed
+with the 
+<a href="#filemenu">File/Status</a>
+button.<p>
+
+<h2>
+Check Status</h2>
+	The Check Status button allows you to choose how much 
+<a href="#status">status</a>
+information is displayed.  The choices are <b>Off</b> (do not display status
+symbols), <b>Check InValid</b> (display symbols only for invalid readings), and
+<b>Check All</b> (display all status symbols).  ADT still receives all status
+information regardless of these choices.  The choices only determine how much
+of the information is displayed.  The button is only operational if status
+process variables have been specified in the 
+<a href="#pvfiles">PV
+file</a>.<p>
+
+<h2>
+Reference Enabled</h2>
+	The Reference Enabled button turns 
+<a href="#reference">referencing</a>
+on and off.  Turning it off will save processing time.  Referencing will be off
+in any event, unless a 
+<a href="#reference">reference
+file</a> has been specified in the PV file or via the 
+<a href="#filemenu">File
+menu</a>.  The reference enabled switch is retained from screen layout to
+screen layout, so if referencing is disabled for one layout, it will remain
+disabled for succeeding layouts.
+<h2>
+<br>
+Zoom Enabled</h2>
+	The Zoom Enabled button turns the zoom window on and off.  Turning it off will
+save processing time.  There will be no zoom window in any event, regardless of
+the setting of this button, if the process variables cannot be matched with the
+lattice elements.  The zoom enabled switch is retained from screen layout to
+screen layout, so if zoom is disabled for one layout, it will remain disabled
+for succeeding layouts.<p>
+
+<h2>
+Accumulated Statistics</h2>
+	The Average Statistics button toggles the statistics displays (SDEV, AVG, and
+MAX) between the current values and those averaged over the Max/Min history
+period for SDEV and AVG or the maximum absolute values during the history
+period for MAX.  The averaging is reset when the history is reset.
+<a name="here"></a>
+ See the next item.<p>
+
+<h2>
+Reset Max/Min</h2>
+	The Reset Max/Min button resets the stored maximum and minimum values for each
+process variable to the current values.  This effectively restarts the Max/Min
+history.  The display of the Max/Min envelope is controlled by the Max/Min and
+Filled Max/Min options in the 
+<a href="#viewmenu">View</a>
+menu.  The Max/Min envelope can also be reset by clicking with the third mouse
+button in any display area.<p>
+
+<h1>
+View <a name="viewmenu">Menu
+</a></h1>
+	Defaults for all of the View Menu items may be specified in the PV file.  They
+are reset to the built-in defaults when the screen layout is changed.<p>
+
+<h2>
+Timing</h2>
+	The Timing button brings up a dialog box that lets you change the screen
+update interval.  Recall that new values are received by ADT when the process
+variables go out of their dead band.  These values are collected and are
+displayed only when the screen updates.<p>
+
+<h2>
+Markers</h2>
+	The Markers toggle button toggles whether markers are shown or not for the
+data points in the upper two display areas.<p>
+
+<h2>
+Lines</h2>
+	The Lines toggle button toggles whether lines are shown or not for the data
+points in the upper two display areas.  If Bars is chosen, then Lines will not
+be, however.<p>
+
+<h2>
+Bars</h2>
+	The Bars toggle button toggles whether impulse lines are shown or not for the
+data points in the upper two display areas.  Bars overrides Lines.<p>
+
+<h2>
+Grid</h2>
+	The Grid toggle button toggles whether grid lines are shown or not in the
+upper two display areas.<p>
+
+<h2>
+Max/Min</h2>
+	The Max/Min toggle button toggles whether the Max/Min envelope is shown or not
+in the display areas.  The Max/Min envelope is reset with the 
+<a href="#optionsmenu">Options/Reset
+Max/Min</a> button or clicking the third mouse button in any display area.<p>
+
+<h2>
+Filled Max/Min</h2>
+	The Filled Max/Min toggle button toggles whether or not the area between the
+maximum and minimum values is filled with gray.  Filling the area makes it
+easier to see where the values have been during the history period.  It does
+nothing if the Max/Min button is not set on.<p>
+<p>
+
+<h1>
+Clear <a name="clearmenu">Menu
+</a></h1>
+<h2>
+Clear</h2>
+	The Clear button clears all three display areas.  Unless 
+<a href="#optionsmenu">EPICS</a>
+is stopped, they will be redrawn at the next scheduled update.<p>
+
+<h2>
+Redraw</h2>
+	The Redraw button redraws all three display areas with the last values used,
+not the current ones.  Unless 
+<a href="#optionsmenu">EPICS</a>
+is stopped, they will be redrawn at the next scheduled update anyway.<p>
+
+<h2>
+Update</h2>
+	The Update button redraws all three display areas with the current values.
+Unless 
+<a href="#optionsmenu">EPICS</a>
+is stopped, they will be redrawn at the next scheduled update anyway.<p>
+
+<h2>
+Autoclear</h2>
+	The Autoclear button toggles whether new values erase old ones or not.
+Turning Autoclear off is another way to obtain a history of the values.
+<h1>
+<br>
+<a name="install">Installation
+</a></h1>
+	In the typical, standard installation there should be a directory in which
+most of the ADT files are found.  The files that should be in this directory
+are:<p>
+
+<menu>
+<li>adtrc
+<li>adt.html
+<li>aps.icon</menu>
+<p>
+	There should be subdirectories <b>pv</b> for 
+<a href="#pvfiles">PV</a>
+and 
+<a href="#latticefiles">lattice
+files</a> and <b>snap</b> for 
+<a href="#snapshotfiles">snapshot
+files</a>.  There may be a similar set of subdirectories, <b>xorbit/pv</b> and
+<b>xorbit/snap</b>, for files used with Xorbit simulation.<p>
+<p>
+	All of these files may be located elsewhere if desired.  See 
+<a href="#config">Configuration</a>.<p>
+<p>
+	The help package also refers to screen layout files:<p>
+
+<menu>
+<li>pv/par.bpm.pv
+<li>pv/par.lat
+<li>snap/par.bpm.ref.snap</menu>
+<p>
+that are assumed to be in subdirectories, <b>pv</b> and <b>snap</b>, relative
+to the location of <b>adt.html</b>.  If they are not there, you will not be
+able to view them from Mosaic.<p>
+<p>
+	The executable file, <b>adt</b>, should be located in a directory somewhere in
+your <b>$PATH</b>.<p>
+<p>
+	The application defaults file, <b>ControlApp</b>, is not required or
+necessary.  If it is used, it should be located as specified in the section on
+the 
+<a href="#appdef">application
+defaults file</a>.  You can specify personal modifications to the resources in
+your <b>.Xdefaults</b> (or equivalent) file or in your own <b>ControlApp</b>
+file in your home directory.  (See an X Windows manual for the involved search
+path that X uses to find resources.)<p>
+
+<h1>
+<a name="config">Configuration
+</a></h1>
+	Exactly what is displayed in ADT is defined via four types of files.  There are 
+<a href="#pvfiles">PV
+files</a>, 
+<a href="#latticefiles">lattice
+files</a>, and 
+<a href="#snapshotfiles">snapshot
+files</a>, which are described below.  
+<a href="#reference">Reference
+files</a> are also snapshot files.  The fourth file is a configuration file,
+described here, that defines what appears in the File/Load menu as well as
+where the default PV files, lattice files, snapshot files, and the help files
+are located. <p>
+<p>
+	The directory for the configuration file may be specified on the 
+<a href="#cmdline">command
+line</a> with the -a option, in which case the program looks for a file named
+<b>adtrc</b> in that directory.  If not specified, the program looks for it
+first in your home directory with the name <b>.adtrc</b> (with a dot).  If one
+is not found, it next looks in the directory given in <b>$ADTHOME</b> if it
+exists, otherwise in the current working directory, for a file named
+<b>adtrc</b> (with no dot).  If it still has not found one or it is invalid,
+there will be no options in the File/Load menu except Custom; the PV and
+snapshot files will be assumed to be in subdirectories, <b>pv</b> and
+<b>snap</b>, to the current working directory; and the help files will be
+assumed to be in the current working directory.<p>
+<p>
+	This configuration file is an SDDS<a href="#fn1">[2]</a> file.  This manual
+assumes you are familiar with SDDS files.  If not, you may need to consult the
+SDDS documentation to understand the meaning of terms such as parameter and
+fixed_value.  The configuration file has string parameters,
+<b>ADTPVDirectory,</b> which specify the directory for the PV and lattice
+files, and <b>ADTSnapDirectory</b>, which specifies the suggested directory for
+the snapshot files.  (Independently of these settings, Custom PV, custom
+lattice, and snapshot files may be read from or written to any directory by
+changing the filter in the file dialog box.)  There are corresponding
+parameters, <b>ADTXPVDirectory</b> and <b>ADTXSnapDirectory</b>, which may
+specify different versions of these directories if 
+<a href="#xorbit">Xorbit
+simulation</a> is used.  It is not necessary to do this.  If the first two
+parameters are not specified and <b>$ADTHOME</b> exists, then they will default
+to <b>$ADTHOME/pv</b> and <b>$ADTHOME/snap, </b>respectively, and will default
+to <b>./pv</b> and <b>./snap</b>, respectively, otherwise.  If the Xorbit
+parameters are not given, they will default to whatever is used for
+<b>ADTPVDirectory</b> and <b>ADTSnapDirectory</b>.<p>
+<p>
+	There is also a string parameter, <b>ADTHelpFile</b>, which specifies the
+location of the Mosaic<a href="#fn2">[3]</a> HTML help file.  This file should
+be in <b>$ADTHOME/adt.html</b>.  It defaults to <b>$ADTHOME/adt.html</b> if
+<b>$ADTHOME</b> exists and to <b>./adt.html</b>, otherwise.  If you are reading
+this in a browser, such as Mosaic, then you are probably browsing a version of
+the <b>adt.html</b> file.<p>
+<p>
+	If any file locations are specified through the above parameters, it is
+suggested that full pathnames be used.<p>
+<p>
+	Each page in the configuration file corresponds to one submenu.  The required
+parameter <b>ADTNMenus</b> specifies how many submenus (pages) there will be.
+It is required because there is currently no way to tell how many pages are in
+an SDDS file until it has been read and the number is needed to allocate space.
+<b>ADTNMenus</b> applies to the whole file and should be a fixed_value, short
+parameter.  The Parameter <b>ADTMenuTitle</b> is a string parameter which
+specifies the label for each submenu button.<p>
+<p>
+There are two string columns, <b>ADTPVFile</b> and <b>ADTMenuLabel</b>, which
+give the name of a PV file (without the path) and the label that will appear in
+the File/Load submenu in order to select this file.  These PV files will be
+expected to be in the <b>ADTPVDirectory</b>.  If these columns are not there,
+there will be no options in the File/Load menu except Custom.<p>
+<p>
+	An example configuration file should be located in 
+<a href="adtrc">$ADTHOME/adtrc</a>.<p>
+<b><p>
+Parameter Summary</b><p>
+
+<menu>
+<li>ADTHelpFile, string, fixed_value
+<li>ADTMenuTitle, string, Required
+<li>ADTNMenus short, fixed_value, Required
+<li>ADTPVDirectory, string, fixed_value
+<li>ADTSnapDirectory, string, fixed_value
+<li>ADTXPVDirectory, string, fixed_value
+<li>ADTXSnapDirectory, string, fixed_value</menu>
+<b><p>
+Column Summary</b><p>
+
+<menu>
+<li>ADTMenuLabel, string, Required
+<li>ADTPVFile, string, Required</menu>
+
+<h1>
+PV <a name="pvfiles">Files
+</a></h1>
+	The PV files specify what process variables are to be displayed in each of the
+display areas, and many of the other factors that determine the screen layout.
+The PV files are valid BURT<a href="#fn3">[4]</a> request files.  They are also
+SDDS files.  This manual assumes you are familiar with SDDS files.  If not, you
+may need to consult the SDDS documentation to understand the meaning of terms
+such as parameter and fixed_value.<p>
+<p>
+	You can make new PV files containing any process variables you wish to
+monitor, and you can save them in your own directories.  The easiest way to
+make a PV file is to find an existing one and modify it.  It should be fairly
+obvious where the changes are to be made.  These can then be read in from the 
+<a href="#filemenu">File/Load/Custom</a>
+menu.  An example PV file should be located in 
+<a href="pv/par.bpm.pv">$ADTHOME/pv/par.bpm.pv</a>.<p>
+<p>
+	There are three types of SDDS parameters that appear in a PV file:<p>
+
+<menu>
+<li>Global Parameters: These refer to the file as a whole and are typically
+entered as fixed_value quantities.
+<li>Array Parameters:  These vary from array to array and refer to the array in
+question.
+<li>Area Parameters:  These refer to the display area associated with the array
+rather than the array.  If there is only one array per display area, there is
+no effective difference between these and array parameters.  When there are
+several arrays assigned to one display area, even though the parameter is
+specified on the page for the array, it really belongs to the display area, and
+since it can only have one value, the last one specified is used.</menu>
+<p>
+	The possible parameters that may be specified in a PV file are:<p>
+<b><p>
+ADTFileType</b>: A required, string parameter that should be "ADTPV".  This is
+a global parameter that merely serves for file checking.<p>
+<b><p>
+ADTNarrays:</b> A required, short parameter that specifies how many arrays
+(pages) are in the file.  It is required because there is currently no way to
+tell how many pages are in an SDDS file until it has been read, and it is
+necessary to allocate space beforehand.  This is a global parameter.<p>
+<b><p>
+ADTNareas:</b> A short parameter that specifies how many display areas are in
+the file.  It is required because there is currently no way to know it until
+the file has been read, and it is necessary to allocate space.  If given, it
+must be the correct number for the display areas assigned by
+<b>ADTDisplayArea</b>.  No unused display areas are allowed.  If not given,
+there will be one array per display area.  This is a global parameter.<p>
+<b><p>
+ADTLatticeFile:</b>  A string parameter that specifies the 
+<a href="#latticefiles">lattice
+file</a> to use for the zoom area.  If not given, there will be no zoom area.
+This is a global parameter.<p>
+<b><p>
+ADTReferenceFile:</b>  A string parameter that specifies the 
+<a href="#reference">reference
+file</a> to use. If not given, there will be no referencing.  This is a global
+parameter.<p>
+<b><p>
+ADTTimeInterval:</b>  A short parameter that specifies the time interval in
+milliseconds between screen updates.  If not specified, the built-in default
+(currently 3000 ms) will be used.  This is a global parameter.<p>
+<b><p>
+ADTMarkers, ADTLines, ADTBars, ADTGrid, ADTMaxMin, ADTFilledMaxMin:</b> These
+short parameters specify the default settings for the toggle buttons in the 
+<a href="#viewmenu">View
+menu</a>.  Positive is true, and 0 is false.  If not specified, the built-in
+defaults will be used.  These are global parameters.<p>
+<b><p>
+ADTHeading</b>: A string parameter that specifies the heading part of the title
+that appears above the display areas.  The title includes the heading followed
+by the units in parentheses.  There is a built-in default.<b><p>
+<p>
+ADTUnits</b>: A string that specifies the units part of the title that appears
+above the display areas.  The default is a blank string.<p>
+<b><p>
+ADTColor:</b>  A string parameter that specifies the named color to use for
+this curve.  The name must be in the X Windows color database.  Case is not
+important.  If not specified, a built-in default will be used.  Names can be of
+the form #rrggbb (like #110000 for Red).<p>
+<b><p>
+ADTZoomArea:</b>  A short parameter that specifies whether this array is to
+appear in the zoom area.  Positive is true, and 0 is false.  The default is
+false.<p>
+<b><p>
+ADTLogScale:</b> A short parameter that specifies whether this array is to
+appear as the logrithm (base 10) of the value.  Positive is true, and 0 is
+false.  The default is false.<p>
+<b><p>
+ADTScaleFactor</b>: A double parameter by which all the raw data will be
+multiplied before being displayed.  For example, to convert raw data in
+millimeters to displayed values in meters, the <b>ADTScaleFactor</b> would be
+0.001, and the <b>ADTUnits</b> would be "m".  If this parameter is not
+supplied, it will be taken as 1.0.<p>
+<b><p>
+ADTDisplayArea:</b>  A short parameter that specifies in which display area to
+display the array.  The display areas are numbered starting with 1 at the top.
+The default is to display one array per display area.<p>
+<b><p>
+ADTUnitsPerDiv</b>: A double parameter that specifies the default units per
+division for the display area for that array.  If there is more than one array
+for that area, the last one is used.  If this number is not one of the
+available values, the next-higher available value will be used.  If this
+parameter is not supplied, the built-in default will be used.  This is an area
+parameter.<p>
+<b><p>
+ADTCenterVal:</b>  A double parameter that specifies the value that corresponds
+to the horizontal axis.  The default is 0.0.  This is an area parameter.<p>
+<p>
+	The PV file has one required string column, <b>ControlName</b>, which contains
+the names of the process variables in the array.  Two other string columns are
+required for the PV file to be a valid BURT request file, a useful thing to do.
+These columns are <b>ControlType</b> and <b>ControlMode</b>.  The control type
+is the string "pv" for process variable and the control mode is usually "RO"
+for read only.  The PV file will have one more column for <b>StatusName</b> if 
+<a href="#status">status</a>
+is implemented.  In that case the column contains the names of the process
+variables that specify the status.<p>
+<b><p>
+Parameter Summary</b><p>
+
+<menu>
+<li>ADTBars, short, fixed_value
+<li>ADTCenterVal, double
+<li>ADTColor, string
+<li>ADTDisplayArea, short
+<li>ADTFileType, string, fixed_value, Required
+<li>ADTFilledMaxMin, short, fixed_value
+<li>ADTGrid, short, fixed_value
+<li>ADTHeading, string
+<li>ADTLatticeFile, string, fixed_value
+<li>ADTLines, short, fixed_value
+<li>ADTLogScale, short
+<li>ADTMarkers, short, fixed_value
+<li>ADTMaxMin, short, fixed_value
+<li>ADTNAreas short, fixed_value
+<li>ADTNArrays short, fixed_value, Required
+<li>ADTReferenceFile, string, fixed_value
+<li>ADTScaleFactor, double
+<li>ADTTimeInterval, short, fixed_value
+<li>ADTUnits, string
+<li>ADTUnitsPerDiv, double
+<li>ADTZoomArea, short</menu>
+<b><p>
+Column Summary</b><p>
+
+<menu>
+<li>ControlMode, string, Required only for BURT compatibility
+<li>ControlName, string, Required
+<li>ControlType, string, Required only for BURT compatibility
+<li>StatusName, string</menu>
+
+<h1>
+Lattice <a name="latticefiles">Files
+</a></h1>
+	The lattice files contain information about all the basic lattice elements,
+including their longitudinal coordinates.  This information is used to draw the
+symbols for the magnets in the Zoom Window and to determine the longitudinal
+coordinates corresponding to the process variables, so that the values can be
+shown in their true relative locations in the Zoom Window.  There should only
+be one lattice file for each ring so you should have little need to make one
+yourself.  An example lattice file should be located in 
+<a href="pv/par.lat">$ADTHOME/pv/par.lat</a>.<p>
+<p>
+	The parameters that must be specified in a Lattice file are:<p>
+<b><p>
+ADTFileType</b>: A required, fixed value of type string that should be
+"ADTLATTICE".<p>
+<b><p>
+Nsectors</b>: A required, fixed value of type short that is the number of
+sectors into which to divide the lattice for the purposes of scrolling.<p>
+<b><p>
+Stotal</b>: A required, fixed value of type double that is total length of the
+lattice in meters.<p>
+<b><p>
+Ring</b>: A required, fixed value of type short that is 1 for a ring and 0 for
+a beamline.<p>
+<p>
+	There is a program, <b>xintolat</b>, that converts Xorbit input (<i>.xin</i>)
+files to lattice files.  Its usage is:<p>
+<p>
+	<b>xintolat</b>  [<b>-h</b>] [<i>file1.xin</i>] [<i>file2.lat</i>]<p>
+
+<menu>
+<li>-h     Help</menu>
+<p>
+If the filenames are not specified, the program will prompt for them.<p>
+<p>
+	The columns that must be specified in a lattice file are:<p>
+<b><p>
+S</b>: A required column of type double that is the position of the start of
+the element in meters.<p>
+<b><p>
+Length</b>: A required column of type double that is the length of the element
+in meters.<p>
+<b><p>
+SymbolHeight</b>: A required column of type short that is the relative height
+of the symbol for the element.  Correctors should use 1, quadrupoles should use
+2, and sextupoles should use 3.  The sign of the number should indicate the
+sign of its strength.<p>
+<b><p>
+Name</b>: A required column of type string that is the name of the element.
+ADT will match elements to process variables by looking for this string as a
+substring of the process variable name.<p>
+<b><p>
+Parameter Summary</b><p>
+
+<menu>
+<li>ADTFileType, string, fixed_value, Required
+<li>Nsectors, short, fixed_value, Required
+<li>Ring, short, fixed_value, Required
+<li>Stotal, double, fixed_value, Required</menu>
+<b><p>
+Column Summary</b><p>
+
+<menu>
+<li>S, double, Required
+<li>Length, double, Required
+<li>SymbolHeight, short, Required
+<li>Name, string, Required</menu>
+
+<h1>
+Snapshot <a name="snapshotfiles">Files
+</a></h1>
+	Snapshot files may be saved via the 
+<a href="#filemenu">File/Write</a>
+menu.  Depending on the options in the menu, these files could contain the
+values of the displayed process variables at the current time, at the time the
+orbit was saved via the 
+<a href="#optionsmenu">Options/Save</a>
+menu, or at the time given in another snapshot file read via the 
+<a href="#filemenu">File/Read</a>
+menu.<p>
+<p>
+	These snapshot files should be equivalent to the ones generated by BURT,
+except that they are paged the same way as the PV files (which are valid BURT
+request files).  BURT collects all the process variables in all the pages of a
+request file, alphabetizes them, and puts the results in a single page in the
+snapshot file.  This makes it hard to extract the information that belongs to
+each array.  There is no loss, other than a lack of strict compatibility, in
+retaining the array pages and not alphabetizing.  Either the conventional BURT
+snapshot files or the ones from ADT are valid request files for BURT.
+Therefore, they can be used to restore the process variables in them if these
+process variables are capable of being restored.  (Monitor readings and
+corrector read backs cannot be restored, for example.  Corrector set points
+can.)  You can save snapshot files in your own directories.  An example
+snapshot file should be located in 
+<a href="snap/par.bpm.ref.snap">$ADTHOME/snap/par.bpm.snap</a>.<p>
+<p>
+	The snapshot file will have two more columns, <b>StatusName</b> and
+<b>StatusValue</b>, if 
+<a href="#status">status</a>
+is implemented, also unlike a BURT snapshot.  You cannot restore the status, so
+this should not be a problem.  For definitions of the other parameters and
+columns, see the BURT documentation.  A summary is given here, however.<p>
+<b><p>
+Parameter Summary</b><p>
+
+<menu>
+<li>SnapType, string, fixed_value
+<li>TimeStamp, string, fixed_value</menu>
+<b><p>
+Column Summary</b><p>
+
+<menu>
+<li>ControlName, string
+<li>ControlType, string
+<li>Count, long
+<li>Lineage, string
+<li>ValueString, string</menu>
+
+<h1>
+Reference Files and <a name="reference">Referencing
+</a></h1>
+	It is possible to read in a file of reference values, either via the 
+<a href="#pvfiles">PV
+file</a> or via the 
+<a href="#filemenu">File
+Menu</a><p>
+.  These values will be subtracted from the raw data before it is displayed.
+Even if a reference file has been read, referencing can be enabled or disabled
+via the 
+<a href="#optionsmenu">Options
+Menu</a>.  This feature can be used to specify monitor offsets, for example,
+and to display the monitor readings relative to the monitor offsets, which is
+usually a more desirable thing to do.  Referencing is similar in operation to
+differencing, except that it can be specified in the PV file.  You can have
+both differencing and referencing on at the same time.  The reference values in
+this case, however, will be subtracted from both the data array and the
+difference data array, which are then subtracted, so it is the same as having
+referencing off.  (The code is smart enough to avoid the subtracting.)<p>
+<p>
+	Any snapshot made from the screen layout may be used for a reference file, and
+the requirements for a reference file are the same as those for a 
+<a href="#snapshotfiles">snapshot
+file</a>.  In particular, the reference file must contain the same arrays with
+the same elements as the PV file specifying the current screen layout.  If this
+snapshot file cannot be made by saving values from ADT, then it would probably
+be wise to take a file that has been so saved and change the values.<p>
+
+<h1>
+Application-Defaults <a name="appdef">File
+</a></h1>
+	The application-defaults file for ADT is named<b> ControlApp</b>.  It is not
+needed in order to run ADT since there are adequate fallback resources defined
+in the program.  The usual place for such files is in
+<b>/usr/lib/X11/app-defaults</b>, and <b>ControlApp</b> should already have
+been put there by a system manager if it is used, so that you do not have to
+worry about it.  You may also have an additional application-defaults file
+named <b>ControlApp</b> in your home directory.  You can put your own resource
+customizations for ADT in this file or in your <b>.Xdefaults</b> file.  The
+latter is preferred.  Note that all of the resources in your private file will
+remain in effect even if the program is changed in a way that requires the
+system <b>ControlApp</b> to be changed.  Consequently, it is advisable to keep
+as few resources as possible in your personal version or to not have a personal
+version at all, especially an out-of-date one.  If you do not understand about
+resources or application-default files, see your local administrator.<p>
+<p>
+	If you do need to changes the resources for your personal needs, the resources
+are listed in resources.h, a file that is included in the distribution for ADT.
+ADT may also be used with the X client, Editres, to find the resource names,
+change them, and experiment with them.<p>
+
+<h1>
+Status <a name="status">Indicators
+</a></h1>
+	ADT can be made to display the status of BPM readings.  The status values must
+be available in a process variable which can have the enumerated values:<p>
+
+<menu>
+<li>0 = InValid
+<li>1 = Valid
+<li>2 = OldData</menu>
+<p>
+	In order to enable this capability there must be an additional string column
+in the 
+<a href="#pvfiles">PV
+file</a> called <b>StatusName</b>.  Each entry in this column should contain
+the name of the process variable that has the status information for the
+process variable that is to be displayed.  If there is no status name or you
+don't want to use it, the entry should be a "-".  If the column is not there,
+there will be no indication of status other than for process variables that are
+not connected.<p>
+<p>
+	When this has been done, the display should be the same as usual when the data
+is <b>Valid</b>.  Otherwise there will be 
+<a href="#color">color-coded</a>
+markers that indicate the status.  
+<a href="#snapshotfiles">Snapshot
+files</a> will have two additional string columns, <b>StatusName</b> and
+<b>StatusValue</b>, to indicate the status.  In addition to the three values
+above, <b>StatusValue</b> may also be <b>NotConnected</b> if ADT was unable to
+find either the process variable for the data or for the status.<p>
+<p>
+	Because of the asynchronous nature of EPICS, there is no guarantee the status
+displayed in ADT is exactly coordinated with the data, but it should be close.
+Decreasing the 
+<a href="#viewmenu">update
+time</a> may make the status markers more accurately reflect what is
+happening.<p>
+
+<h1>
+Color <a name="color">Code
+</a></h1>
+<dl>
+<dt>Grey40:
+<dd>Stored data points in the display areas.
+<dt>Black :
+<dd>Data points that are not connected (large, square markers)
+<dt>Grey30:
+<dd>Data points that are Invalid (large, round markers)
+<dt>Grey50:
+<dd>Data points that are OldData  (large, round markers)</dl>
+<h1>
+Xorbit Simulation <a name="xorbit">Mode
+</a></h1>
+<p>
+<p>
+	Xorbit can in principle be made to simulate the orbit for any of the lattices
+in the APS, although not all of them have been implemented at this time.  To do
+this there is a special database of process variables in an IOC.  These process
+variables closely resemble the real process variables for monitors and power
+supplies and have the same names with "<b>Xorbit:</b>" attached.  When
+setpoints for magnet power supplies are changed via the control system, Xorbit
+is notified and calculates the appropriate orbit.  It then supplies the new
+readings to the readbacks for the power supplies and monitors.  This process
+takes about 4 seconds for the over 3000 process variables for the storage ring,
+but is essentially instantaneous for the PAR.<p>
+<p>
+ 	The simulation includes the effects of random magnet displacements and
+monitor offsets and includes nonlinear effects from the sextupoles.  This
+simulation capability allows physics application codes to be tested and
+debugged on something resembling a real system without disturbing the real
+system or before the real system is operational.<p>
+<p>
+	ADT may be run in Xorbit simulation mode by specifying -x on the 
+<a href="#cmdline">command
+line</a>.  In this mode it attaches "<b>Xorbit:</b>" to the front of all
+process variable names when it reads them and removes this pattern when it
+writes them to a file.  Consequently, PV files may be tested with Xorbit with
+no change to the files, provided the lattice has been implemented in Xorbit and
+provided the actual names and the names in the Xorbit database follow the same
+naming conventions. <p>
+<p>
+	Xorbit calculates magnet strengths in theoretical units (e.g. radians for
+corrector magnets) whereas the real process variables correspond to power
+supply currents (Amperes).  The relationship between the current and the
+strength depends on the magnet hardware and the energy of the beam.  The Xorbit
+database has been designed to convert between theoretical units and Amperes,
+taking these relationships into account.<p>
+ <hr>
+<a name="fn0">[1]</a>Motif is a standard graphical interface for X Windows
+systems.  It is characterized by a three-dimensional look and feel.<p>
+<a name="fn1">[2]</a>SSDS stands for Self-Describing Data Sets and is a format
+developed by Michael Borland to provide a flexible and standard, general
+purpose, file format.  There are routines available for reading and writing
+SDDS files.<p>
+<a name="fn2">[3]</a>This manual was designed to be printed and also viewed
+on-line in Mosaic.  Mosaic is an information browser that connects to many
+information sites on the Internet and World Wide Web.  It was developed at the
+National Center for Supercomputing Applications at the University of
+Illinois.<p>
+<a name="fn3">[4]</a>BURT is the backup and restore program for the APS control
+system.
+</body></html>

@@ -1,0 +1,23 @@
+SDDS1
+&description text="ADT Lattice File" &end
+&parameter name=ADTFileType fixed_value="ADTLATTICE" type=string &end
+&parameter name=Nsectors fixed_value=1 type=short &end
+&parameter name=Stotal fixed_value=12. type=double &end
+&parameter name=Ring fixed_value=0 type=short &end
+&column name=S type=double &end
+&column name=Length type=double &end
+&column name=SymbolHeight type=short &end
+&column name=Name type=string &end
+&data mode=ascii no_row_counts=1 &end
+  0.500000  0.000000  0 L1:PM1
+  1.500000  0.000000  0 L2:PM1
+  2.500000  0.000000  0 L2:PM2
+  3.500000  0.000000  0 L2:PM3
+  4.500000  0.000000  0 L3:PM1
+  5.500000  0.000000  0 L4:PM1
+  6.500000  0.000000  0 L4:PM2
+  7.500000  0.000000  0 L4:PM3
+  8.500000  0.000000  0 L5:PM1
+  9.500000  0.000000  0 L5:PM2
+ 10.500000  0.000000  0 L5:PM3
+ 11.500000  0.000000  0 L5:PM4

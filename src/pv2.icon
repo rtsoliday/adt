@@ -1,0 +1,4 @@
+#define pv2_width 5
+#define pv2_height 5
+static unsigned char pv2_bits[] = {
+   0x0e, 0x1f, 0x1f, 0x1f, 0x0e};

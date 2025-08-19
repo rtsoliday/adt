@@ -1,0 +1,181 @@
+SDDS1
+&description
+  text="ADT PV file for PAR Magnet Readbacks and Setpoints"
+&end
+&parameter name=ADTFileType fixed_value="ADTPV" type=string &end
+&parameter name=ADTNArrays type=short fixed_value=6 &end
+&parameter name=ADTNAreas type=short fixed_value=3 &end
+&parameter name=ADTBars type=short fixed_value=0 &end
+!&parameter name=ADTReferenceFile fixed_value="" type=string &end
+!&parameter name=ADTLatticeFile fixed_value="par.lat" type=string &end
+&parameter name=ADTHeading type=string &end
+&parameter name=ADTUnits type=string &end
+&parameter name=ADTScaleFactor type=double &end
+&parameter name=ADTUnitsPerDiv type=double &end
+&parameter name=ADTCenterVal type=double &end
+&parameter name=ADTDisplayArea type=short &end
+&parameter name=ADTZoomArea type=short &end
+&parameter name=ADTLogScale type=short &end
+&parameter name=ADTColor type=string &end
+&column name=ControlName type=string &end
+&column name=ControlType type=string &end
+&column name=ControlMode type=string &end
+&data mode=ascii no_row_counts=1 additional_header_lines=1 &end
+
+! Corrector Setpoints
+PAR CORRECTOR SETPOINTS
+Ampere
+1.0     ! ScaleFactor
+0.2	! UnitsPerDiv
+0.0	! CenterVal
+1	! Area
+0	! ZoomArea
+0	! LogScale
+Red
+P2H1:CurrentAO pv -
+P2V1:CurrentAO pv -
+P2H2:CurrentAO pv -
+P2V2:CurrentAO pv -
+P2H3:CurrentAO pv -
+P2V3:CurrentAO pv -
+P3V2:CurrentAO pv -
+P3H2:CurrentAO pv -
+P3V1:CurrentAO pv -
+P3H1:CurrentAO pv -
+P4H1:CurrentAO pv -
+P4V1:CurrentAO pv -
+P4H2:CurrentAO pv -
+P4V2:CurrentAO pv -
+P1V3:CurrentAO pv -
+P1H3:CurrentAO pv -
+P1V2:CurrentAO pv -
+P1H2:CurrentAO pv -
+P1V1:CurrentAO pv -
+P1H1:CurrentAO pv -
+
+! Corrector Readbacks
+PAR CORRECTOR READBACKS
+Ampere
+1.0     ! ScaleFactor
+0.2	! UnitsPerDiv
+0.0	! CenterVal
+1	! Area
+0	! ZoomArea
+0	! LogScale
+Blue
+P2H1:CurrentAI pv -
+P2V1:CurrentAI pv -
+P2H2:CurrentAI pv -
+P2V2:CurrentAI pv -
+P2H3:CurrentAI pv -
+P2V3:CurrentAI pv -
+P3V2:CurrentAI pv -
+P3H2:CurrentAI pv -
+P3V1:CurrentAI pv -
+P3H1:CurrentAI pv -
+P4H1:CurrentAI pv -
+P4V1:CurrentAI pv -
+P4H2:CurrentAI pv -
+P4V2:CurrentAI pv -
+P1V3:CurrentAI pv -
+P1H3:CurrentAI pv -
+P1V2:CurrentAI pv -
+P1H2:CurrentAI pv -
+P1V1:CurrentAI pv -
+P1H1:CurrentAI pv -
+
+! Quadrupole Setpoints
+PAR QUADRUPOLE READBACKS
+Ampere
+1.0     ! ScaleFactor
+50.	! UnitsPerDiv
+0.0	! CenterVal
+2	! Area
+0	! ZoomArea
+0	! LogScale
+Red
+P2Q1:CurrentAO pv -
+P2Q2:CurrentAO pv -
+P2Q3:CurrentAO pv -
+P2Q4:CurrentAO pv -
+P3Q4:CurrentAO pv -
+P3Q3:CurrentAO pv -
+P3Q2:CurrentAO pv -
+P3Q1:CurrentAO pv -
+P4Q1:CurrentAO pv -
+P4Q2:CurrentAO pv -
+P4Q3:CurrentAO pv -
+P4Q4:CurrentAO pv -
+P1Q4:CurrentAO pv -
+P1Q3:CurrentAO pv -
+P1Q2:CurrentAO pv -
+P1Q1:CurrentAO pv -
+
+! Quadrupole Readbacks
+PAR QUADRUPOLE READBACKS
+Ampere
+1.0     ! ScaleFactor
+50.	! UnitsPerDiv
+0.0	! CenterVal
+2	! Area
+0	! ZoomArea
+0	! LogScale
+Blue
+P2Q1:CurrentAI pv -
+P2Q2:CurrentAI pv -
+P2Q3:CurrentAI pv -
+P2Q4:CurrentAI pv -
+P3Q4:CurrentAI pv -
+P3Q3:CurrentAI pv -
+P3Q2:CurrentAI pv -
+P3Q1:CurrentAI pv -
+P4Q1:CurrentAI pv -
+P4Q2:CurrentAI pv -
+P4Q3:CurrentAI pv -
+P4Q4:CurrentAI pv -
+P1Q4:CurrentAI pv -
+P1Q3:CurrentAI pv -
+P1Q2:CurrentAI pv -
+P1Q1:CurrentAI pv -
+
+! Sextupole Setpoints
+PAR SEXTUPOLE READBACKS
+Ampere
+1.0     ! ScaleFactor
+1.0	! UnitsPerDiv
+0.0	! CenterVal
+3	! Area
+0	! ZoomArea
+0	! LogScale
+Red
+P2S1:CurrentAO pv -
+P2SD:CurrentAO pv -
+P2SF:CurrentAO pv -
+P3SD:CurrentAO pv -
+P3S1:CurrentAO pv -
+P4S1:CurrentAO pv -
+P4SD:CurrentAO pv -
+P1SF:CurrentAO pv -
+P1SD:CurrentAO pv -
+P1S1:CurrentAO pv -
+
+! Sextupole Readbacks
+PAR SEXTUPOLE READBACKS
+Ampere
+1.0     ! ScaleFactor
+1.0	! UnitsPerDiv
+0.0	! CenterVal
+3	! Area
+0	! ZoomArea
+0	! LogScale
+Blue
+P2S1:CurrentAI pv -
+P2SD:CurrentAI pv -
+P2SF:CurrentAI pv -
+P3SD:CurrentAI pv -
+P3S1:CurrentAI pv -
+P4S1:CurrentAI pv -
+P4SD:CurrentAI pv -
+P1SF:CurrentAI pv -
+P1SD:CurrentAI pv -
+P1S1:CurrentAI pv -

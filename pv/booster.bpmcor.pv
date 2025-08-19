@@ -1,0 +1,397 @@
+SDDS1
+&description
+  text="ADT PV file for BOOSTER Monitors and Corrector Setpoints"
+&end
+&parameter name=ADTFileType fixed_value="ADTPV" type=string &end
+&parameter name=ADTNArrays type=short fixed_value=6 &end
+&parameter name=ADTNAreas type=short fixed_value=3 &end
+&parameter name=ADTLatticeFile type=string fixed_value="booster.lat" &end
+!&parameter name=ADTReferenceFile fixed_value="" type=string &end
+&parameter name=ADTHeading type=string &end
+&parameter name=ADTUnits type=string &end
+&parameter name=ADTUnitsPerDiv type=double &end
+&parameter name=ADTScaleFactor type=double &end
+&parameter name=ADTCenterVal type=double &end
+&parameter name=ADTDisplayArea type=short &end
+&parameter name=ADTZoomArea type=short fixed_value=0 &end
+!&parameter name=ADTLogScale type=short &end
+&parameter name=ADTColor type=string &end
+&column name=ControlName type=string &end
+&column name=ControlType type=string &end
+&column name=ControlMode type=string &end
+&column name=StatusName type=string &end
+&data mode=ascii no_row_counts=1 additional_header_lines=1 &end
+
+! x BPM readings
+BOOSTER HORIZONTAL BPM'S
+mm
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+1       ! ADTDisplayArea
+Red
+B1C0P1:ms:x pv RO B1C0P1:ms.XAVS
+B1C0P2:ms:x pv RO B1C0P2:ms.XAVS
+B1C1P1:ms:x pv RO B1C1P1:ms.XAVS
+B1C1P2:ms:x pv RO B1C1P2:ms.XAVS
+B1C2P1:ms:x pv RO B1C2P1:ms.XAVS
+B1C2P2:ms:x pv RO B1C2P2:ms.XAVS
+B1C3P1:ms:x pv RO B1C3P1:ms.XAVS
+B1C3P2:ms:x pv RO B1C3P2:ms.XAVS
+B1C4P1:ms:x pv RO B1C4P1:ms.XAVS
+B1C4P2:ms:x pv RO B1C4P2:ms.XAVS
+B1C5P1:ms:x pv RO B1C5P1:ms.XAVS
+B1C5P2:ms:x pv RO B1C5P2:ms.XAVS
+B1C6P1:ms:x pv RO B1C6P1:ms.XAVS
+B1C6P2:ms:x pv RO B1C6P2:ms.XAVS
+B1C7P1:ms:x pv RO B1C7P1:ms.XAVS
+B1C7P2:ms:x pv RO B1C7P2:ms.XAVS
+B1C8P1:ms:x pv RO B1C8P1:ms.XAVS
+B1C8P2:ms:x pv RO B1C8P2:ms.XAVS
+B1C9P1:ms:x pv RO B1C9P1:ms.XAVS
+B1C9P2:ms:x pv RO B1C9P2:ms.XAVS
+B2C0P1:ms:x pv RO B2C0P1:ms.XAVS
+B2C0P2:ms:x pv RO B2C0P2:ms.XAVS
+B2C1P1:ms:x pv RO B2C1P1:ms.XAVS
+B2C1P2:ms:x pv RO B2C1P2:ms.XAVS
+B2C2P1:ms:x pv RO B2C2P1:ms.XAVS
+B2C2P2:ms:x pv RO B2C2P2:ms.XAVS
+B2C3P1:ms:x pv RO B2C3P1:ms.XAVS
+B2C3P2:ms:x pv RO B2C3P2:ms.XAVS
+B2C4P1:ms:x pv RO B2C4P1:ms.XAVS
+B2C4P2:ms:x pv RO B2C4P2:ms.XAVS
+B2C5P1:ms:x pv RO B2C5P1:ms.XAVS
+B2C5P2:ms:x pv RO B2C5P2:ms.XAVS
+B2C6P1:ms:x pv RO B2C6P1:ms.XAVS
+B2C6P2:ms:x pv RO B2C6P2:ms.XAVS
+B2C7P1:ms:x pv RO B2C7P1:ms.XAVS
+B2C7P2:ms:x pv RO B2C7P2:ms.XAVS
+B2C8P1:ms:x pv RO B2C8P1:ms.XAVS
+B2C8P2:ms:x pv RO B2C8P2:ms.XAVS
+B2C9P1:ms:x pv RO B2C9P1:ms.XAVS
+B2C9P2:ms:x pv RO B2C9P2:ms.XAVS
+B3C0P1:ms:x pv RO B3C0P1:ms.XAVS
+B3C0P2:ms:x pv RO B3C0P2:ms.XAVS
+B3C1P1:ms:x pv RO B3C1P1:ms.XAVS
+B3C1P2:ms:x pv RO B3C1P2:ms.XAVS
+B3C2P1:ms:x pv RO B3C2P1:ms.XAVS
+B3C2P2:ms:x pv RO B3C2P2:ms.XAVS
+B3C3P1:ms:x pv RO B3C3P1:ms.XAVS
+B3C3P2:ms:x pv RO B3C3P2:ms.XAVS
+B3C4P1:ms:x pv RO B3C4P1:ms.XAVS
+B3C4P2:ms:x pv RO B3C4P2:ms.XAVS
+B3C5P1:ms:x pv RO B3C5P1:ms.XAVS
+B3C5P2:ms:x pv RO B3C5P2:ms.XAVS
+B3C6P1:ms:x pv RO B3C6P1:ms.XAVS
+B3C6P2:ms:x pv RO B3C6P2:ms.XAVS
+B3C7P1:ms:x pv RO B3C7P1:ms.XAVS
+B3C7P2:ms:x pv RO B3C7P2:ms.XAVS
+B3C8P1:ms:x pv RO B3C8P1:ms.XAVS
+B3C8P2:ms:x pv RO B3C8P2:ms.XAVS
+B3C9P1:ms:x pv RO B3C9P1:ms.XAVS
+B3C9P2:ms:x pv RO B3C9P2:ms.XAVS
+B4C0P1:ms:x pv RO B4C0P1:ms.XAVS
+B4C0P2:ms:x pv RO B4C0P2:ms.XAVS
+B4C1P1:ms:x pv RO B4C1P1:ms.XAVS
+B4C1P2:ms:x pv RO B4C1P2:ms.XAVS
+B4C2P1:ms:x pv RO B4C2P1:ms.XAVS
+B4C2P2:ms:x pv RO B4C2P2:ms.XAVS
+B4C3P1:ms:x pv RO B4C3P1:ms.XAVS
+B4C3P2:ms:x pv RO B4C3P2:ms.XAVS
+B4C4P1:ms:x pv RO B4C4P1:ms.XAVS
+B4C4P2:ms:x pv RO B4C4P2:ms.XAVS
+B4C5P1:ms:x pv RO B4C5P1:ms.XAVS
+B4C5P2:ms:x pv RO B4C5P2:ms.XAVS
+B4C6P1:ms:x pv RO B4C6P1:ms.XAVS
+B4C6P2:ms:x pv RO B4C6P2:ms.XAVS
+B4C7P1:ms:x pv RO B4C7P1:ms.XAVS
+B4C7P2:ms:x pv RO B4C7P2:ms.XAVS
+B4C8P1:ms:x pv RO B4C8P1:ms.XAVS
+B4C8P2:ms:x pv RO B4C8P2:ms.XAVS
+B4C9P1:ms:x pv RO B4C9P1:ms.XAVS
+B4C9P2:ms:x pv RO B4C9P2:ms.XAVS
+
+! y BPM readings
+BOOSTER VERTICAL BPM'S
+mm
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+1       ! ADTDisplayArea
+Blue
+B1C0P1:ms:y pv RO B1C0P1:ms.YAVS
+B1C0P2:ms:y pv RO B1C0P2:ms.YAVS
+B1C1P1:ms:y pv RO B1C1P1:ms.YAVS
+B1C1P2:ms:y pv RO B1C1P2:ms.YAVS
+B1C2P1:ms:y pv RO B1C2P1:ms.YAVS
+B1C2P2:ms:y pv RO B1C2P2:ms.YAVS
+B1C3P1:ms:y pv RO B1C3P1:ms.YAVS
+B1C3P2:ms:y pv RO B1C3P2:ms.YAVS
+B1C4P1:ms:y pv RO B1C4P1:ms.YAVS
+B1C4P2:ms:y pv RO B1C4P2:ms.YAVS
+B1C5P1:ms:y pv RO B1C5P1:ms.YAVS
+B1C5P2:ms:y pv RO B1C5P2:ms.YAVS
+B1C6P1:ms:y pv RO B1C6P1:ms.YAVS
+B1C6P2:ms:y pv RO B1C6P2:ms.YAVS
+B1C7P1:ms:y pv RO B1C7P1:ms.YAVS
+B1C7P2:ms:y pv RO B1C7P2:ms.YAVS
+B1C8P1:ms:y pv RO B1C8P1:ms.YAVS
+B1C8P2:ms:y pv RO B1C8P2:ms.YAVS
+B1C9P1:ms:y pv RO B1C9P1:ms.YAVS
+B1C9P2:ms:y pv RO B1C9P2:ms.YAVS
+B2C0P1:ms:y pv RO B2C0P1:ms.YAVS
+B2C0P2:ms:y pv RO B2C0P2:ms.YAVS
+B2C1P1:ms:y pv RO B2C1P1:ms.YAVS
+B2C1P2:ms:y pv RO B2C1P2:ms.YAVS
+B2C2P1:ms:y pv RO B2C2P1:ms.YAVS
+B2C2P2:ms:y pv RO B2C2P2:ms.YAVS
+B2C3P1:ms:y pv RO B2C3P1:ms.YAVS
+B2C3P2:ms:y pv RO B2C3P2:ms.YAVS
+B2C4P1:ms:y pv RO B2C4P1:ms.YAVS
+B2C4P2:ms:y pv RO B2C4P2:ms.YAVS
+B2C5P1:ms:y pv RO B2C5P1:ms.YAVS
+B2C5P2:ms:y pv RO B2C5P2:ms.YAVS
+B2C6P1:ms:y pv RO B2C6P1:ms.YAVS
+B2C6P2:ms:y pv RO B2C6P2:ms.YAVS
+B2C7P1:ms:y pv RO B2C7P1:ms.YAVS
+B2C7P2:ms:y pv RO B2C7P2:ms.YAVS
+B2C8P1:ms:y pv RO B2C8P1:ms.YAVS
+B2C8P2:ms:y pv RO B2C8P2:ms.YAVS
+B2C9P1:ms:y pv RO B2C9P1:ms.YAVS
+B2C9P2:ms:y pv RO B2C9P2:ms.YAVS
+B3C0P1:ms:y pv RO B3C0P1:ms.YAVS
+B3C0P2:ms:y pv RO B3C0P2:ms.YAVS
+B3C1P1:ms:y pv RO B3C1P1:ms.YAVS
+B3C1P2:ms:y pv RO B3C1P2:ms.YAVS
+B3C2P1:ms:y pv RO B3C2P1:ms.YAVS
+B3C2P2:ms:y pv RO B3C2P2:ms.YAVS
+B3C3P1:ms:y pv RO B3C3P1:ms.YAVS
+B3C3P2:ms:y pv RO B3C3P2:ms.YAVS
+B3C4P1:ms:y pv RO B3C4P1:ms.YAVS
+B3C4P2:ms:y pv RO B3C4P2:ms.YAVS
+B3C5P1:ms:y pv RO B3C5P1:ms.YAVS
+B3C5P2:ms:y pv RO B3C5P2:ms.YAVS
+B3C6P1:ms:y pv RO B3C6P1:ms.YAVS
+B3C6P2:ms:y pv RO B3C6P2:ms.YAVS
+B3C7P1:ms:y pv RO B3C7P1:ms.YAVS
+B3C7P2:ms:y pv RO B3C7P2:ms.YAVS
+B3C8P1:ms:y pv RO B3C8P1:ms.YAVS
+B3C8P2:ms:y pv RO B3C8P2:ms.YAVS
+B3C9P1:ms:y pv RO B3C9P1:ms.YAVS
+B3C9P2:ms:y pv RO B3C9P2:ms.YAVS
+B4C0P1:ms:y pv RO B4C0P1:ms.YAVS
+B4C0P2:ms:y pv RO B4C0P2:ms.YAVS
+B4C1P1:ms:y pv RO B4C1P1:ms.YAVS
+B4C1P2:ms:y pv RO B4C1P2:ms.YAVS
+B4C2P1:ms:y pv RO B4C2P1:ms.YAVS
+B4C2P2:ms:y pv RO B4C2P2:ms.YAVS
+B4C3P1:ms:y pv RO B4C3P1:ms.YAVS
+B4C3P2:ms:y pv RO B4C3P2:ms.YAVS
+B4C4P1:ms:y pv RO B4C4P1:ms.YAVS
+B4C4P2:ms:y pv RO B4C4P2:ms.YAVS
+B4C5P1:ms:y pv RO B4C5P1:ms.YAVS
+B4C5P2:ms:y pv RO B4C5P2:ms.YAVS
+B4C6P1:ms:y pv RO B4C6P1:ms.YAVS
+B4C6P2:ms:y pv RO B4C6P2:ms.YAVS
+B4C7P1:ms:y pv RO B4C7P1:ms.YAVS
+B4C7P2:ms:y pv RO B4C7P2:ms.YAVS
+B4C8P1:ms:y pv RO B4C8P1:ms.YAVS
+B4C8P2:ms:y pv RO B4C8P2:ms.YAVS
+B4C9P1:ms:y pv RO B4C9P1:ms.YAVS
+B4C9P2:ms:y pv RO B4C9P2:ms.YAVS
+
+! x Correctors
+BOOSTER HORIZONTAL CORRECTOR SETPOINTS
+Amperes
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+2       ! ADTDisplayArea
+Magenta
+B1C0H:CurrentAO pv - -
+B1C1H:CurrentAO pv - -
+B1C2H:CurrentAO pv - -
+B1C3H:CurrentAO pv - -
+B1C4H:CurrentAO pv - -
+B1C5H:CurrentAO pv - -
+B1C6H:CurrentAO pv - -
+B1C7H:CurrentAO pv - -
+B1C8H:CurrentAO pv - -
+B1C9H:CurrentAO pv - -
+B2C0H:CurrentAO pv - -
+B2C1H:CurrentAO pv - -
+B2C2H:CurrentAO pv - -
+B2C3H:CurrentAO pv - -
+B2C4H:CurrentAO pv - -
+B2C5H:CurrentAO pv - -
+B2C6H:CurrentAO pv - -
+B2C7H:CurrentAO pv - -
+B2C8H:CurrentAO pv - -
+B2C9H:CurrentAO pv - -
+B3C0H:CurrentAO pv - -
+B3C1H:CurrentAO pv - -
+B3C2H:CurrentAO pv - -
+B3C3H:CurrentAO pv - -
+B3C4H:CurrentAO pv - -
+B3C5H:CurrentAO pv - -
+B3C6H:CurrentAO pv - -
+B3C7H:CurrentAO pv - -
+B3C8H:CurrentAO pv - -
+B3C9H:CurrentAO pv - -
+B4C0H:CurrentAO pv - -
+B4C1H:CurrentAO pv - -
+B4C2H:CurrentAO pv - -
+B4C3H:CurrentAO pv - -
+B4C4H:CurrentAO pv - -
+B4C5H:CurrentAO pv - -
+B4C6H:CurrentAO pv - -
+B4C7H:CurrentAO pv - -
+B4C8H:CurrentAO pv - -
+B4C9H:CurrentAO pv - -
+
+! y Correctors
+BOOSTER VERTICAL CORRECTOR SETPOINTS
+Amperes
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+2       ! ADTDisplayArea
+Purple
+B1C0V:CurrentAO pv - -
+B1C1V:CurrentAO pv - -
+B1C2V:CurrentAO pv - -
+B1C3V:CurrentAO pv - -
+B1C4V:CurrentAO pv - -
+B1C5V:CurrentAO pv - -
+B1C6V:CurrentAO pv - -
+B1C7V:CurrentAO pv - -
+B1C8V:CurrentAO pv - -
+B1C9V:CurrentAO pv - -
+B2C0V:CurrentAO pv - -
+B2C1V:CurrentAO pv - -
+B2C2V:CurrentAO pv - -
+B2C3V:CurrentAO pv - -
+B2C4V:CurrentAO pv - -
+B2C5V:CurrentAO pv - -
+B2C6V:CurrentAO pv - -
+B2C7V:CurrentAO pv - -
+B2C8V:CurrentAO pv - -
+B2C9V:CurrentAO pv - -
+B3C0V:CurrentAO pv - -
+B3C1V:CurrentAO pv - -
+B3C2V:CurrentAO pv - -
+B3C3V:CurrentAO pv - -
+B3C4V:CurrentAO pv - -
+B3C5V:CurrentAO pv - -
+B3C6V:CurrentAO pv - -
+B3C7V:CurrentAO pv - -
+B3C8V:CurrentAO pv - -
+B3C9V:CurrentAO pv - -
+B4C0V:CurrentAO pv - -
+B4C1V:CurrentAO pv - -
+B4C2V:CurrentAO pv - -
+B4C3V:CurrentAO pv - -
+B4C4V:CurrentAO pv - -
+B4C5V:CurrentAO pv - -
+B4C6V:CurrentAO pv - -
+B4C7V:CurrentAO pv - -
+B4C8V:CurrentAO pv - -
+B4C9V:CurrentAO pv - -
+
+! x Correctors
+BOOSTER HORIZONTAL CORRECTOR READBACKS
+Amperes
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+3       ! ADTDisplayArea
+Magenta
+B1C0H:CurrentAI pv - -
+B1C1H:CurrentAI pv - -
+B1C2H:CurrentAI pv - -
+B1C3H:CurrentAI pv - -
+B1C4H:CurrentAI pv - -
+B1C5H:CurrentAI pv - -
+B1C6H:CurrentAI pv - -
+B1C7H:CurrentAI pv - -
+B1C8H:CurrentAI pv - -
+B1C9H:CurrentAI pv - -
+B2C0H:CurrentAI pv - -
+B2C1H:CurrentAI pv - -
+B2C2H:CurrentAI pv - -
+B2C3H:CurrentAI pv - -
+B2C4H:CurrentAI pv - -
+B2C5H:CurrentAI pv - -
+B2C6H:CurrentAI pv - -
+B2C7H:CurrentAI pv - -
+B2C8H:CurrentAI pv - -
+B2C9H:CurrentAI pv - -
+B3C0H:CurrentAI pv - -
+B3C1H:CurrentAI pv - -
+B3C2H:CurrentAI pv - -
+B3C3H:CurrentAI pv - -
+B3C4H:CurrentAI pv - -
+B3C5H:CurrentAI pv - -
+B3C6H:CurrentAI pv - -
+B3C7H:CurrentAI pv - -
+B3C8H:CurrentAI pv - -
+B3C9H:CurrentAI pv - -
+B4C0H:CurrentAI pv - -
+B4C1H:CurrentAI pv - -
+B4C2H:CurrentAI pv - -
+B4C3H:CurrentAI pv - -
+B4C4H:CurrentAI pv - -
+B4C5H:CurrentAI pv - -
+B4C6H:CurrentAI pv - -
+B4C7H:CurrentAI pv - -
+B4C8H:CurrentAI pv - -
+B4C9H:CurrentAI pv - -
+
+! y Correctors
+BOOSTER VERTICAL CORRECTOR READBACKS
+Amperes
+1.0     ! ADTUnitsPerDiv
+1.0     ! ADTScaleFactor
+0.0     ! ADTCenterVal
+3       ! ADTDisplayArea
+Purple
+B1C0V:CurrentAI pv - -
+B1C1V:CurrentAI pv - -
+B1C2V:CurrentAI pv - -
+B1C3V:CurrentAI pv - -
+B1C4V:CurrentAI pv - -
+B1C5V:CurrentAI pv - -
+B1C6V:CurrentAI pv - -
+B1C7V:CurrentAI pv - -
+B1C8V:CurrentAI pv - -
+B1C9V:CurrentAI pv - -
+B2C0V:CurrentAI pv - -
+B2C1V:CurrentAI pv - -
+B2C2V:CurrentAI pv - -
+B2C3V:CurrentAI pv - -
+B2C4V:CurrentAI pv - -
+B2C5V:CurrentAI pv - -
+B2C6V:CurrentAI pv - -
+B2C7V:CurrentAI pv - -
+B2C8V:CurrentAI pv - -
+B2C9V:CurrentAI pv - -
+B3C0V:CurrentAI pv - -
+B3C1V:CurrentAI pv - -
+B3C2V:CurrentAI pv - -
+B3C3V:CurrentAI pv - -
+B3C4V:CurrentAI pv - -
+B3C5V:CurrentAI pv - -
+B3C6V:CurrentAI pv - -
+B3C7V:CurrentAI pv - -
+B3C8V:CurrentAI pv - -
+B3C9V:CurrentAI pv - -
+B4C0V:CurrentAI pv - -
+B4C1V:CurrentAI pv - -
+B4C2V:CurrentAI pv - -
+B4C3V:CurrentAI pv - -
+B4C4V:CurrentAI pv - -
+B4C5V:CurrentAI pv - -
+B4C6V:CurrentAI pv - -
+B4C7V:CurrentAI pv - -
+B4C8V:CurrentAI pv - -
+B4C9V:CurrentAI pv - -

@@ -1,0 +1,4 @@
+#define pv1_width 5
+#define pv1_height 5
+static unsigned char pv1_bits[] = {
+   0x1f, 0x1f, 0x1f, 0x1f, 0x1f};
