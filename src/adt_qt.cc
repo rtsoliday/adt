@@ -27,9 +27,11 @@
 #include <QString>
 #include <QWidget>
 #include <QList>
+#include <QVector>
 
 #include <SDDS.h>
 #include <QDir>
+#include <cadef.h>
 
 #define INITFILENAME "adtrc"
 
@@ -292,14 +294,79 @@ public:
     });
   }
 
+  ~MainWindow() override
+  {
+    for (chid ch : channels)
+      ca_clear_channel(ch);
+    if (caStarted)
+      ca_context_destroy();
+  }
+
 private:
   QString customDirectory;
   QString pvFilename;
+  QVector<chid> channels;
+  bool caStarted = false;
 
   void loadPvFile(const QString &file)
   {
     pvFilename = file;
-    QMessageBox::information(this, "ADT", "PV file set to:\n" + file);
+
+    if (caStarted) {
+      for (chid ch : channels)
+        ca_clear_channel(ch);
+      channels.clear();
+      ca_context_destroy();
+      caStarted = false;
+    }
+
+    if (ca_context_create(ca_disable_preemptive_callback) != ECA_NORMAL) {
+      QMessageBox::warning(this, "ADT", "Unable to start Channel Access");
+      return;
+    }
+    caStarted = true;
+
+    SDDS_TABLE table;
+    QByteArray fname = file.toUtf8();
+    if (!SDDS_InitializeInput(&table, fname.data()) ||
+        SDDS_ReadTable(&table) <= 0) {
+      QMessageBox::warning(this, "ADT", "Unable to read PV file:\n" + file);
+      SDDS_Terminate(&table);
+      ca_context_destroy();
+      caStarted = false;
+      return;
+    }
+
+    int rows = SDDS_CountRowsOfInterest(&table);
+    char **names = (char **)SDDS_GetColumn(&table,
+      const_cast<char *>("ControlName"));
+    if (!names) {
+      QMessageBox::warning(this, "ADT",
+        "PV file missing ControlName column");
+      SDDS_Terminate(&table);
+      ca_context_destroy();
+      caStarted = false;
+      return;
+    }
+
+    for (int i = 0; i < rows; ++i) {
+      chid ch;
+      int status = ca_create_channel(names[i], NULL, NULL, 0, &ch);
+      if (status == ECA_NORMAL)
+        channels.append(ch);
+    }
+
+    if (ca_pend_io(5.0) == ECA_TIMEOUT)
+      QMessageBox::warning(this, "ADT", "Timeout connecting to PVs");
+
+    for (int i = 0; i < rows; ++i)
+      SDDS_Free(names[i]);
+    SDDS_Free(names);
+    SDDS_Terminate(&table);
+
+    setWindowTitle("ADT - " + QFileInfo(file).fileName());
+    QMessageBox::information(this, "ADT",
+      QString("Loaded %1 PVs from:\n%2").arg(channels.size()).arg(file));
   }
 };
 
