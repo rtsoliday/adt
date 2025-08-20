@@ -373,6 +373,8 @@ public:
     auto titleBox = new QVBoxLayout;
     vbox->addLayout(titleBox);
     QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    QFontMetrics fm(fixedFont);
+    int statWidth = fm.horizontalAdvance(" 000.000");
     for (auto arr : arrayPtrs) {
       auto row = new QHBoxLayout;
       titleBox->addLayout(row);
@@ -394,18 +396,24 @@ public:
       row->addWidget(sdevText);
       auto sdevLabel = new QLabel;
       sdevLabel->setFont(fixedFont);
+      sdevLabel->setAlignment(Qt::AlignRight);
+      sdevLabel->setFixedWidth(statWidth);
       row->addWidget(sdevLabel);
-      auto avgText = new QLabel("    AVG:");
+      auto avgText = new QLabel("   AVG:");
       avgText->setFont(fixedFont);
       row->addWidget(avgText);
       auto avgLabel = new QLabel;
       avgLabel->setFont(fixedFont);
+      avgLabel->setAlignment(Qt::AlignRight);
+      avgLabel->setFixedWidth(statWidth);
       row->addWidget(avgLabel);
-      auto maxText = new QLabel("    MAX:");
+      auto maxText = new QLabel("   MAX:");
       maxText->setFont(fixedFont);
       row->addWidget(maxText);
       auto maxLabel = new QLabel;
       maxLabel->setFont(fixedFont);
+      maxLabel->setAlignment(Qt::AlignRight);
+      maxLabel->setFixedWidth(statWidth);
       row->addWidget(maxLabel);
       StatLabels sl{ sdevLabel, avgLabel, maxLabel };
       stats.append(sl);
