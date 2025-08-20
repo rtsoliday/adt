@@ -31,11 +31,13 @@
 #include <QMouseEvent>
 #include <QDoubleSpinBox>
 #include <QString>
+#include <QLineEdit>
 #include <QWidget>
 #include <QList>
 #include <QVector>
 #include <QColor>
 #include <QTimer>
+#include <QInputDialog>
 #include <QPointer>
 #include <limits>
 #include <cmath>
@@ -463,10 +465,10 @@ public:
 
     plot = new PlotWidget(adata, arrays, this);
     vbox->addWidget(plot, 1);
-    int plotHeight = 160 + 1;
+    int plotHeight = 148 + 1;
     plot->setMinimumHeight(plotHeight);
     int topHeight = controls->sizeHint().height() + titleBox->sizeHint().height();
-    setMinimumHeight(plotHeight + topHeight);
+    setMinimumHeight(plotHeight + topHeight + 15);
 
     connect(scaleSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
       this, [this](double val)
@@ -623,7 +625,26 @@ public:
     optionsMenu->addAction("Reset Max/Min");
 
     QMenu *viewMenu = menuBar()->addMenu("View");
-    viewMenu->addAction("Timing...");
+    QAction *timingAct = viewMenu->addAction("Timing...");
+    connect(timingAct, &QAction::triggered, this, [this]()
+    {
+      bool ok = false;
+      QString text = QInputDialog::getText(this, "Update Interval",
+        "Enter interval between updates in ms:", QLineEdit::Normal,
+        QString::number(timeInterval), &ok);
+      if (ok) {
+        bool okVal = false;
+        int newVal = text.toInt(&okVal);
+        if (okVal && newVal > 0) {
+          timeInterval = newVal;
+          if (pollTimer)
+            pollTimer->start(timeInterval);
+        } else {
+          QMessageBox::warning(this, "ADT",
+            QString("Invalid time value: %1").arg(text));
+        }
+      }
+    });
     QAction *markersAct = viewMenu->addAction("Markers");
     markersAct->setCheckable(true);
     markersAct->setChecked(markers);
