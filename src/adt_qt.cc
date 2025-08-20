@@ -16,6 +16,7 @@
 #include <QFileInfo>
 #include <QFile>
 #include <QFont>
+#include <QFontDatabase>
 #include <QByteArray>
 #include <QFontMetrics>
 #include <QLabel>
@@ -35,6 +36,7 @@
 #include <QVector>
 #include <QColor>
 #include <QTimer>
+#include <QPointer>
 #include <limits>
 #include <cmath>
 #include <cstring>
@@ -325,15 +327,39 @@ protected:
           }
         }
       }
-      QMessageBox::information(this, "Information", info);
+      if (infoBox)
+        infoBox->close();
+      infoBox = new QMessageBox(QMessageBox::Information, "Information",
+        info, QMessageBox::NoButton, this);
+      infoBox->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+      infoBox->setAttribute(Qt::WA_DeleteOnClose);
+      infoBox->setModal(false);
+      infoBox->show();
     } else {
       QWidget::mousePressEvent(event);
+    }
+  }
+
+  void mouseReleaseEvent(QMouseEvent *event) override
+  {
+    if (event->button() == Qt::LeftButton && infoBox) {
+      int w = width();
+      int h = height();
+      int headerHeight = 20;
+      QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
+      if (plotRect.contains(event->pos()))
+        infoBox->close();
+      else
+        QWidget::mouseReleaseEvent(event);
+    } else {
+      QWidget::mouseReleaseEvent(event);
     }
   }
 
 private:
   AreaData *area;
   QVector<ArrayData *> arrayPtrs;
+  QPointer<QMessageBox> infoBox;
 };
 
 /**
