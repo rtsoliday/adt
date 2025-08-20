@@ -61,6 +61,7 @@ static constexpr int GRIDDIVISIONS = 5;
 static const char *PVID = "ADTPV";
 static constexpr double LARGEVAL = 1e40;
 static const char *SDDSID = "SDDS1";
+static const char *SNAPID = "ADTSNAP";
 
 static const double scale[] = {
   0.001, 0.002, 0.005, 0.010, 0.020, 0.050, 0.100, 0.200, 0.500,
@@ -625,7 +626,8 @@ public:
     for (int i = 1; i <= NSAVE; ++i)
       readSnapMenu->addAction(QString::number(i));
     QMenu *writeMenu = fileMenu->addMenu("Write");
-    writeMenu->addAction("Current");
+    QAction *writeCurAct = writeMenu->addAction("Current");
+    connect(writeCurAct, &QAction::triggered, this, [this]() { writeCurrent(); });
     for (int i = 1; i <= NSAVE; ++i)
       writeMenu->addAction(QString::number(i));
     QMenu *plotMenu = fileMenu->addMenu("Plot");
@@ -957,6 +959,70 @@ private:
     return true;
   }
 
+  bool writeSnapFile(const QString &filename)
+  {
+    FILE *file = fopen(filename.toUtf8().constData(), "w");
+    if (!file) {
+      QMessageBox::warning(this, "ADT",
+        QString("Unable to open %1").arg(filename));
+      return false;
+    }
+
+    time_t clock = std::time(nullptr);
+    char tbuf[26];
+    std::strncpy(tbuf, std::ctime(&clock), 24);
+    tbuf[24] = '\0';
+
+    fprintf(file, "%s\n", SDDSID);
+    fprintf(file,
+      "&description text=\"ADT Snapshot from %s\" contents=\"BURT\" &end\n",
+      pvFilename.toUtf8().constData());
+    fprintf(file,
+      "&parameter name=ADTFileType fixed_value=\"%s\" type=string &end\n",
+      SNAPID);
+    fprintf(file,
+      "&parameter name=TimeStamp fixed_value=\"%s\" type=string &end\n",
+      tbuf);
+    fprintf(file,
+      "&parameter name=SnapType fixed_value=\"Absolute\" type=string &end\n");
+    fprintf(file, "&parameter name=Heading type=string &end\n");
+    fprintf(file, "&column name=ControlName type=string &end\n");
+    fprintf(file, "&column name=ControlType type=string &end\n");
+    fprintf(file, "&column name=Lineage type=string &end\n");
+    fprintf(file, "&column name=Count type=long &end\n");
+    fprintf(file, "&column name=ValueString type=string &end\n");
+    fprintf(file,
+      "&data mode=ascii no_row_counts=1 additional_header_lines=1 &end\n");
+    for (const ArrayData &arr : arrays) {
+      fprintf(file, "\n");
+      fprintf(file, "%s (%s)\n", arr.heading.toUtf8().constData(),
+        arr.units.toUtf8().constData());
+      for (int i = 0; i < arr.nvals; ++i) {
+        fprintf(file, "%s pv - 1 %f\n",
+          arr.names[i].toUtf8().constData(), arr.vals[i]);
+      }
+    }
+    fclose(file);
+    return true;
+  }
+
+  /**
+   * @brief Write current array data to a snapshot file.
+   */
+  void writeCurrent()
+  {
+    if (arrays.isEmpty()) {
+      QMessageBox::warning(this, "ADT", "There are no PV's defined");
+      return;
+    }
+    QString dir = QFileInfo(pvFilename).absolutePath();
+    QString fn = QFileDialog::getSaveFileName(this, "Write Snapshot File",
+      dir, "Snapshot Files (*.snap)");
+    if (fn.isEmpty())
+      return;
+    writeSnapFile(fn);
+  }
+
   void plotCurrent()
   {
     if (arrays.isEmpty()) {
@@ -1225,8 +1291,6 @@ private:
     setCentralWidget(central);
 
     setWindowTitle("ADT - " + QFileInfo(file).fileName());
-    QMessageBox::information(this, "ADT",
-      QString("Loaded %1 PVs from:\n%2").arg(channels.size()).arg(file));
     pollTimer->start(timeInterval);
   }
 };
