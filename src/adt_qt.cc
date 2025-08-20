@@ -416,6 +416,9 @@ public:
 
     plot = new PlotWidget(adata, arrays, this);
     vbox->addWidget(plot, 1);
+    int plotHeight = 150 + 20 + 1;
+    plot->setMinimumHeight(plotHeight);
+    setMinimumHeight(plotHeight + top->sizeHint().height());
 
     connect(scaleSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
       this, [this](double val)
@@ -448,7 +451,7 @@ public:
     });
 
     updateStats();
-    setMinimumSize(800, 150);
+    setMinimumWidth(800);
   }
 
   void refresh()
