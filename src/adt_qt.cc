@@ -39,6 +39,7 @@
 #include <QTimer>
 #include <QInputDialog>
 #include <QPointer>
+#include <QPixmap>
 #include <limits>
 #include <cmath>
 #include <cstring>
@@ -72,6 +73,7 @@ static bool markers = true;
 static bool lines = true;
 static bool bars = false;
 static bool grid = true;
+static bool autoclear = true;
 
 struct AreaData
 {
@@ -81,6 +83,8 @@ struct AreaData
   double xmin = 0.0;
   double xmax = 0.0;
   bool initialized = false;
+  bool tempclear = false;
+  bool tempnodraw = false;
 };
 
 struct ArrayData
@@ -248,16 +252,22 @@ public:
 protected:
   void paintEvent(QPaintEvent *) override
   {
-    QPainter p(this);
-    p.fillRect(rect(), Qt::white);
+    if (pixmap.size() != size()) {
+      pixmap = QPixmap(size());
+      pixmap.fill(Qt::white);
+    }
+    QPainter pmap(&pixmap);
+    if (autoclear || area->tempclear)
+      pmap.fillRect(pixmap.rect(), Qt::white);
+    area->tempclear = false;
 
-    int w = width();
-    int h = height();
+    int w = pixmap.width();
+    int h = pixmap.height();
     int headerHeight = 0;
     QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
 
-    p.setPen(Qt::black);
-    p.drawRect(plotRect);
+    pmap.setPen(Qt::black);
+    pmap.drawRect(plotRect);
 
     double upd = scale[area->currScale];
     double ymin = area->centerVal - upd * GRIDDIVISIONS;
@@ -273,47 +283,58 @@ protected:
     };
 
     if (grid) {
-      p.setPen(Qt::gray);
+      pmap.setPen(Qt::gray);
       for (int i = -GRIDDIVISIONS; i <= GRIDDIVISIONS; ++i) {
         int y = mapY(area->centerVal + i * upd);
-        p.drawLine(plotRect.left(), y, plotRect.right(), y);
+        pmap.drawLine(plotRect.left(), y, plotRect.right(), y);
       }
     }
-    p.setPen(Qt::black);
+    pmap.setPen(Qt::black);
+
+    int y0 = mapY(area->centerVal);
+
+    if (area->tempnodraw) {
+      area->tempnodraw = false;
+      QPainter pw(this);
+      pw.drawPixmap(0, 0, pixmap);
+      return;
+    }
 
     for (auto arr : arrayPtrs) {
       if (arr->nvals < 1)
         continue;
       double xstep = arr->nvals > 1 ? plotRect.width() /
         static_cast<double>(arr->nvals - 1) : 0.0;
-      int y0 = mapY(area->centerVal);
       if (bars) {
-        p.setPen(arr->color);
+        pmap.setPen(arr->color);
         for (int i = 0; i < arr->nvals; ++i) {
           int x = plotRect.left() + static_cast<int>(i * xstep);
           int y = mapY(arr->vals[i]);
-          p.drawLine(x, y0, x, y);
+          pmap.drawLine(x, y0, x, y);
         }
       } else if (lines) {
-        p.setPen(arr->color);
+        pmap.setPen(arr->color);
         QPainterPath path;
         path.moveTo(plotRect.left(), mapY(arr->vals[0]));
         for (int i = 1; i < arr->nvals; ++i)
           path.lineTo(plotRect.left() + static_cast<int>(i * xstep),
             mapY(arr->vals[i]));
-        p.drawPath(path);
+        pmap.drawPath(path);
       }
       if (markers) {
-        p.setPen(arr->color);
-        p.setBrush(arr->color);
+        pmap.setPen(arr->color);
+        pmap.setBrush(arr->color);
         for (int i = 0; i < arr->nvals; ++i) {
           int x = plotRect.left() + static_cast<int>(i * xstep);
           int y = mapY(arr->vals[i]);
-          p.drawRect(x - 1, y - 1, 3, 3);
+          pmap.drawRect(x - 1, y - 1, 3, 3);
         }
-        p.setBrush(Qt::NoBrush);
+        pmap.setBrush(Qt::NoBrush);
       }
     }
+
+    QPainter pw(this);
+    pw.drawPixmap(0, 0, pixmap);
   }
 
   void mousePressEvent(QMouseEvent *event) override
@@ -384,6 +405,7 @@ private:
   AreaData *area;
   QVector<ArrayData *> arrayPtrs;
   QPointer<QMessageBox> infoBox;
+  QPixmap pixmap;
 };
 
 /**
@@ -696,11 +718,34 @@ public:
     fillAct->setCheckable(true);
 
     QMenu *clearMenu = menuBar()->addMenu("Clear");
-    clearMenu->addAction("Clear");
-    clearMenu->addAction("Redraw");
-    clearMenu->addAction("Update");
+    QAction *clearAct = clearMenu->addAction("Clear");
+    connect(clearAct, &QAction::triggered, this, [this]()
+    {
+      for (AreaData &area : areas) {
+        area.tempnodraw = true;
+        area.tempclear = true;
+      }
+      resetGraph();
+    });
+    QAction *redrawAct = clearMenu->addAction("Redraw");
+    connect(redrawAct, &QAction::triggered, this, [this]()
+    {
+      for (AreaData &area : areas)
+        area.tempclear = true;
+      resetGraph();
+    });
+    QAction *updateAct = clearMenu->addAction("Update");
+    connect(updateAct, &QAction::triggered, this, [this]()
+    {
+      resetGraph();
+    });
     QAction *autoAct = clearMenu->addAction("Autoclear");
     autoAct->setCheckable(true);
+    autoAct->setChecked(autoclear);
+    connect(autoAct, &QAction::toggled, this, [](bool checked)
+    {
+      autoclear = checked;
+    });
 
     QMenu *helpMenu = menuBar()->addMenu("Help");
     helpMenu->addAction("Contents");
@@ -747,6 +792,12 @@ private:
   QTimer *pollTimer = nullptr;
   int timeInterval = 2000;
   bool caStarted = false;
+
+  void resetGraph()
+  {
+    for (auto aw : areaWidgets)
+      aw->refresh();
+  }
 
   void pollPvUpdate()
   {
