@@ -34,6 +34,7 @@
 #include <QVector>
 #include <QColor>
 #include <limits>
+#include <cmath>
 #include <cstring>
 #include <cstdint>
 
@@ -84,6 +85,9 @@ struct ArrayData
   QString heading;
   QString units;
   double scaleFactor = 1.0;
+  double sdev = 0.0;
+  double avg = 0.0;
+  double maxVal = 0.0;
   AreaData *area = nullptr;
   QColor color;
 };
@@ -297,7 +301,8 @@ class AreaWidget : public QWidget
 public:
   AreaWidget(AreaData *adata, const QVector<ArrayData *> &arrays,
     QWidget *parent = nullptr)
-    : QWidget(parent), area(adata)
+    : QWidget(parent), area(adata),
+      primaryArray(arrays.isEmpty() ? nullptr : arrays[0])
   {
     auto vbox = new QVBoxLayout(this);
     vbox->setContentsMargins(0, 0, 0, 0);
@@ -324,6 +329,21 @@ public:
     centerSpin->setValue(area->centerVal);
     top->addWidget(centerSpin);
     top->addStretch();
+
+    auto sdevText = new QLabel("SDEV:");
+    top->addWidget(sdevText);
+    sdevLabel = new QLabel;
+    top->addWidget(sdevLabel);
+
+    auto avgText = new QLabel("    AVG:");
+    top->addWidget(avgText);
+    avgLabel = new QLabel;
+    top->addWidget(avgLabel);
+
+    auto maxText = new QLabel("    MAX:");
+    top->addWidget(maxText);
+    maxLabel = new QLabel;
+    top->addWidget(maxLabel);
 
     plot = new PlotWidget(adata, arrays, this);
     vbox->addWidget(plot, 1);
@@ -358,14 +378,31 @@ public:
       plot->update();
     });
 
+    updateStats();
     setMinimumSize(800, 150);
   }
 
 private:
+  void updateStats()
+  {
+    if (!primaryArray)
+      return;
+    sdevLabel->setText(QString("%1").arg(
+      primaryArray->sdev * primaryArray->scaleFactor, 0, 'f', 3));
+    avgLabel->setText(QString("%1").arg(
+      primaryArray->avg * primaryArray->scaleFactor, 0, 'f', 3));
+    maxLabel->setText(QString("%1").arg(
+      primaryArray->maxVal * primaryArray->scaleFactor, 0, 'f', 3));
+  }
+
   AreaData *area;
+  ArrayData *primaryArray;
   PlotWidget *plot;
   QDoubleSpinBox *scaleSpin;
   QDoubleSpinBox *centerSpin;
+  QLabel *sdevLabel;
+  QLabel *avgLabel;
+  QLabel *maxLabel;
 };
 
 class MainWindow : public QMainWindow
@@ -698,6 +735,26 @@ private:
         ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
     }
     ca_pend_io(5.0);
+
+    for (ArrayData &arr : arrays) {
+      double sum = 0.0;
+      double sumsq = 0.0;
+      double maxv = 0.0;
+      for (int i = 0; i < arr.nvals; ++i) {
+        double v = arr.vals[i];
+        sum += v;
+        sumsq += v * v;
+        if (i == 0 || std::fabs(v) > std::fabs(maxv))
+          maxv = v;
+      }
+      if (arr.nvals > 0) {
+        arr.avg = sum / arr.nvals;
+        arr.sdev = std::sqrt(sumsq / arr.nvals - arr.avg * arr.avg);
+        arr.maxVal = maxv;
+      } else {
+        arr.avg = arr.sdev = arr.maxVal = 0.0;
+      }
+    }
 
     QWidget *central = new QWidget;
     QVBoxLayout *layout = new QVBoxLayout(central);
