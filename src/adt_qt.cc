@@ -28,12 +28,60 @@
 #include <QWidget>
 #include <QList>
 #include <QVector>
+#include <QColor>
+#include <limits>
+#include <cstring>
+#include <cstdint>
 
 #include <SDDS.h>
 #include <QDir>
 #include <cadef.h>
 
 #define INITFILENAME "adtrc"
+
+static constexpr int GRIDDIVISIONS = 5;
+static const char *PVID = "ADTPV";
+static constexpr double LARGEVAL = 1e40;
+
+static const double scale[] = {
+  0.001, 0.002, 0.005, 0.010, 0.020, 0.050, 0.100, 0.200, 0.500,
+  1.000, 2.000, 5.000, 10.00, 20.00, 50.00, 100.0, 200.0, 500.0,
+  1000., 2000., 5000.
+};
+static constexpr int NSCALES = sizeof(scale) / sizeof(scale[0]);
+
+static const char *defaultColors[] = {
+  "Red", "Blue", "Green3", "Gold", "Magenta", "Cyan", "Orange",
+  "Purple", "SpringGreen", "Chartreuse", "DeepSkyBlue",
+  "MediumSpringGreen", "Tomato", "Tan", "Grey75", "Black"
+};
+static constexpr int NCOLORS = sizeof(defaultColors) / sizeof(defaultColors[0]);
+
+struct AreaData
+{
+  int index = 0;
+  int currScale = 0;
+  double centerVal = 0.0;
+  double xmin = 0.0;
+  double xmax = 0.0;
+  bool initialized = false;
+};
+
+struct ArrayData
+{
+  int index = 0;
+  int nvals = 0;
+  QVector<QString> names;
+  QVector<double> vals;
+  QVector<double> minVals;
+  QVector<double> maxVals;
+  QVector<bool> conn;
+  QString heading;
+  QString units;
+  double scaleFactor = 1.0;
+  AreaData *area = nullptr;
+  QColor color;
+};
 
 struct LoadItem
 {
@@ -305,6 +353,8 @@ public:
 private:
   QString customDirectory;
   QString pvFilename;
+  QVector<ArrayData> arrays;
+  QVector<AreaData> areas;
   QVector<chid> channels;
   bool caStarted = false;
 
@@ -320,6 +370,9 @@ private:
       caStarted = false;
     }
 
+    arrays.clear();
+    areas.clear();
+
     if (ca_context_create(ca_disable_preemptive_callback) != ECA_NORMAL) {
       QMessageBox::warning(this, "ADT", "Unable to start Channel Access");
       return;
@@ -328,41 +381,157 @@ private:
 
     SDDS_TABLE table;
     QByteArray fname = file.toUtf8();
-    if (!SDDS_InitializeInput(&table, fname.data()) ||
-        SDDS_ReadTable(&table) <= 0) {
+    if (!SDDS_InitializeInput(&table, fname.data())) {
       QMessageBox::warning(this, "ADT", "Unable to read PV file:\n" + file);
-      SDDS_Terminate(&table);
       ca_context_destroy();
       caStarted = false;
       return;
     }
 
-    int rows = SDDS_CountRowsOfInterest(&table);
-    char **names = (char **)SDDS_GetColumn(&table,
-      const_cast<char *>("ControlName"));
-    if (!names) {
-      QMessageBox::warning(this, "ADT",
-        "PV file missing ControlName column");
-      SDDS_Terminate(&table);
-      ca_context_destroy();
-      caStarted = false;
-      return;
+    bool first = true;
+    bool oneAreaPerArray = false;
+    int iarray;
+    int narrays = 0;
+    int nareas = 0;
+    int32_t templong = 0;
+
+    while ((iarray = SDDS_ReadTable(&table)) > 0) {
+      iarray--;
+      if (first) {
+        char *type = NULL;
+        if (!SDDS_GetParameter(&table, const_cast<char *>("ADTFileType"), &type) ||
+            strcmp(type, PVID)) {
+          QMessageBox::warning(this, "ADT", "Not a valid ADT PV file");
+          if (type)
+            SDDS_Free(type);
+          SDDS_Terminate(&table);
+          ca_context_destroy();
+          caStarted = false;
+          return;
+        }
+        SDDS_Free(type);
+        if (!SDDS_GetParameterAsLong(&table, const_cast<char *>("ADTNArrays"),
+            &templong)) {
+          QMessageBox::warning(this, "ADT", "Missing ADTNArrays parameter");
+          SDDS_Terminate(&table);
+          ca_context_destroy();
+          caStarted = false;
+          return;
+        }
+        narrays = templong;
+        if (!SDDS_GetParameterAsLong(&table, const_cast<char *>("ADTNAreas"),
+            &templong)) {
+          oneAreaPerArray = true;
+          templong = narrays;
+        }
+        nareas = templong;
+        arrays.resize(narrays);
+        areas.resize(nareas);
+        first = false;
+      }
+
+      if (iarray >= narrays)
+        continue;
+
+      ArrayData &arr = arrays[iarray];
+      arr.index = iarray;
+
+      char *strptr = NULL;
+      if (!SDDS_GetParameter(&table, const_cast<char *>("ADTColor"), &strptr)) {
+        arr.color = QColor(defaultColors[iarray % NCOLORS]);
+      } else {
+        arr.color = QColor(strptr);
+        SDDS_Free(strptr);
+      }
+      if (!arr.color.isValid())
+        arr.color = Qt::black;
+
+      char *heading = NULL;
+      if (SDDS_GetParameter(&table, const_cast<char *>("ADTHeading"), &heading) && heading) {
+        arr.heading = heading;
+        SDDS_Free(heading);
+      } else {
+        arr.heading = QString("Array %1").arg(iarray + 1);
+      }
+
+      char *units = NULL;
+      if (SDDS_GetParameter(&table, const_cast<char *>("ADTUnits"), &units) && units) {
+        arr.units = units;
+        SDDS_Free(units);
+      } else {
+        arr.units.clear();
+      }
+
+      double sf;
+      if (SDDS_GetParameterAsDouble(&table, const_cast<char *>("ADTScaleFactor"), &sf))
+        arr.scaleFactor = sf;
+      else
+        arr.scaleFactor = 1.0;
+
+      int iarea;
+      if (oneAreaPerArray)
+        iarea = iarray;
+      else {
+        if (SDDS_GetParameterAsLong(&table, const_cast<char *>("ADTDisplayArea"), &templong))
+          iarea = static_cast<int>(templong) - 1;
+        else
+          iarea = iarray;
+      }
+      if (iarea < 0 || iarea >= nareas)
+        iarea = 0;
+      arr.area = &areas[iarea];
+      AreaData &area = areas[iarea];
+      if (!area.initialized) {
+        area.index = iarea;
+        double center;
+        if (!SDDS_GetParameterAsDouble(&table, const_cast<char *>("ADTCenterVal"), &center))
+          center = 0.0;
+        area.centerVal = center;
+        double upd;
+        if (!SDDS_GetParameterAsDouble(&table, const_cast<char *>("ADTUnitsPerDiv"), &upd))
+          upd = 1.0;
+        int iscale = 0;
+        while (iscale < NSCALES && upd > scale[iscale])
+          ++iscale;
+        if (iscale >= NSCALES)
+          iscale = NSCALES - 1;
+        area.currScale = iscale;
+        area.xmax = area.centerVal + scale[iscale] * GRIDDIVISIONS;
+        area.xmin = area.centerVal - scale[iscale] * GRIDDIVISIONS;
+        area.initialized = true;
+      }
+
+      int rows = SDDS_CountRowsOfInterest(&table);
+      arr.nvals = rows;
+      arr.names.clear();
+      arr.vals.fill(0.0, rows);
+      arr.minVals.fill(LARGEVAL, rows);
+      arr.maxVals.fill(-LARGEVAL, rows);
+      arr.conn.fill(false, rows);
+
+      char **names = (char **)SDDS_GetColumn(&table, const_cast<char *>("ControlName"));
+      if (!names) {
+        QMessageBox::warning(this, "ADT", "PV file missing ControlName column");
+        SDDS_Terminate(&table);
+        ca_context_destroy();
+        caStarted = false;
+        return;
+      }
+      for (int i = 0; i < rows; ++i) {
+        arr.names.append(names[i]);
+        chid ch;
+        int status = ca_create_channel(names[i], NULL, NULL, 0, &ch);
+        if (status == ECA_NORMAL)
+          channels.append(ch);
+        SDDS_Free(names[i]);
+      }
+      SDDS_Free(names);
     }
 
-    for (int i = 0; i < rows; ++i) {
-      chid ch;
-      int status = ca_create_channel(names[i], NULL, NULL, 0, &ch);
-      if (status == ECA_NORMAL)
-        channels.append(ch);
-    }
+    SDDS_Terminate(&table);
 
     if (ca_pend_io(5.0) == ECA_TIMEOUT)
       QMessageBox::warning(this, "ADT", "Timeout connecting to PVs");
-
-    for (int i = 0; i < rows; ++i)
-      SDDS_Free(names[i]);
-    SDDS_Free(names);
-    SDDS_Terminate(&table);
 
     setWindowTitle("ADT - " + QFileInfo(file).fileName());
     QMessageBox::information(this, "ADT",
