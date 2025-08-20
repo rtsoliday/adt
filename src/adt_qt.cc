@@ -24,8 +24,10 @@
 #include <QMenuBar>
 #include <QPainter>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QPainterPath>
 #include <QMessageBox>
+#include <QDoubleSpinBox>
 #include <QString>
 #include <QWidget>
 #include <QList>
@@ -219,14 +221,13 @@ protected:
 /**
  * @brief Widget for displaying a single ADT plotting area.
  */
-class AreaWidget : public QWidget
+class PlotWidget : public QWidget
 {
 public:
-  AreaWidget(AreaData *adata, const QVector<ArrayData *> &arrays,
+  PlotWidget(AreaData *adata, const QVector<ArrayData *> &arrays,
     QWidget *parent = nullptr)
     : QWidget(parent), area(adata), arrayPtrs(arrays)
   {
-    setMinimumSize(800, 150);
   }
 
 protected:
@@ -280,15 +281,83 @@ protected:
     QString head = arrayPtrs[0]->heading;
     if (!arrayPtrs[0]->units.isEmpty())
       head += QString(" (%1)").arg(arrayPtrs[0]->units);
-    QString info = QString("  %1 /div  Center: %2")
-      .arg(scale[area->currScale], 0, 'f', 3)
-      .arg(area->centerVal, 0, 'f', 3);
-    p.drawText(5, 15, head + info);
+    p.drawText(5, 15, head);
   }
 
 private:
   AreaData *area;
   QVector<ArrayData *> arrayPtrs;
+};
+
+/**
+ * @brief Combines scale and center controls with a plot widget.
+ */
+class AreaWidget : public QWidget
+{
+public:
+  AreaWidget(AreaData *adata, const QVector<ArrayData *> &arrays,
+    QWidget *parent = nullptr)
+    : QWidget(parent), area(adata)
+  {
+    auto vbox = new QVBoxLayout(this);
+    vbox->setContentsMargins(0, 0, 0, 0);
+    auto top = new QHBoxLayout;
+    vbox->addLayout(top);
+
+    auto scaleLabel = new QLabel("Scale:");
+    top->addWidget(scaleLabel);
+    scaleSpin = new QDoubleSpinBox;
+    scaleSpin->setDecimals(3);
+    scaleSpin->setRange(scale[0], scale[NSCALES - 1]);
+    scaleSpin->setValue(scale[area->currScale]);
+    top->addWidget(scaleSpin);
+
+    auto centerLabel = new QLabel("Center:");
+    top->addWidget(centerLabel);
+    centerSpin = new QDoubleSpinBox;
+    centerSpin->setDecimals(3);
+    centerSpin->setRange(-LARGEVAL, LARGEVAL);
+    centerSpin->setValue(area->centerVal);
+    top->addWidget(centerSpin);
+    top->addStretch();
+
+    plot = new PlotWidget(adata, arrays, this);
+    vbox->addWidget(plot, 1);
+
+    connect(scaleSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+      this, [this](double val)
+    {
+      int iscale = 0;
+      while (iscale < NSCALES && val > scale[iscale])
+        ++iscale;
+      if (iscale >= NSCALES)
+        iscale = NSCALES - 1;
+      area->currScale = iscale;
+      area->xmax = area->centerVal + scale[iscale] * GRIDDIVISIONS;
+      area->xmin = area->centerVal - scale[iscale] * GRIDDIVISIONS;
+      scaleSpin->blockSignals(true);
+      scaleSpin->setValue(scale[iscale]);
+      scaleSpin->blockSignals(false);
+      plot->update();
+    });
+
+    connect(centerSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+      this, [this](double val)
+    {
+      area->centerVal = val;
+      area->xmax = area->centerVal + scale[area->currScale] * GRIDDIVISIONS;
+      area->xmin = area->centerVal - scale[area->currScale] * GRIDDIVISIONS;
+      plot->update();
+    });
+
+    setMinimumSize(800, 150);
+  }
+
+private:
+  AreaData *area;
+  PlotWidget *plot;
+  QDoubleSpinBox *scaleSpin;
+  QDoubleSpinBox *centerSpin;
 };
 
 class MainWindow : public QMainWindow
