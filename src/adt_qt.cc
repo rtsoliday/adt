@@ -830,7 +830,7 @@ private:
       for (int i = 0; i < arr.nvals; ++i)
         ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
     }
-    ca_pend_io(5.0);
+    ca_pend_io(1.0);
     for (ArrayData &arr : arrays) {
       double sum = 0.0;
       double sumsq = 0.0;
@@ -1238,14 +1238,14 @@ private:
 
     SDDS_Terminate(&table);
 
-    if (ca_pend_io(5.0) == ECA_TIMEOUT)
-      QMessageBox::warning(this, "ADT", "Timeout connecting to PVs");
+    if (ca_pend_io(1.0) == ECA_TIMEOUT)
+      QMessageBox::warning(this, "ADT", "Timeout connecting to PVs. ADT may be sluggish.");
 
     for (ArrayData &arr : arrays) {
       for (int i = 0; i < arr.nvals; ++i)
         ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
     }
-    ca_pend_io(5.0);
+    ca_pend_io(1.0);
 
     for (ArrayData &arr : arrays) {
       double sum = 0.0;
