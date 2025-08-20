@@ -38,6 +38,8 @@
 #include <QColor>
 #include <QTimer>
 #include <QInputDialog>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QPointer>
 #include <QPixmap>
 #include <QProcess>
@@ -73,6 +75,7 @@ static const char *defaultColors[] = {
   "MediumSpringGreen", "Tomato", "Tan", "Grey75", "Black"
 };
 static constexpr int NCOLORS = sizeof(defaultColors) / sizeof(defaultColors[0]);
+static constexpr int NSAVE = 5;
 
 static bool markers = true;
 static bool lines = true;
@@ -108,6 +111,9 @@ struct ArrayData
   double sdev = 0.0;
   double avg = 0.0;
   double maxVal = 0.0;
+  double runSdev = 0.0;
+  double runAvg = 0.0;
+  double runMax = 0.0;
   AreaData *area = nullptr;
   QColor color;
 };
@@ -581,7 +587,6 @@ class MainWindow : public QMainWindow
 public:
   explicit MainWindow(QWidget *parent = nullptr) : QMainWindow(parent)
   {
-    constexpr int NSAVE = 5;
     auto logo = new LogoWidget(this);
     setCentralWidget(logo);
     pollTimer = new QTimer(this);
@@ -628,9 +633,11 @@ public:
     connect(plotCurAct, &QAction::triggered, this, [this]() { plotCurrent(); });
     for (int i = 1; i <= NSAVE; ++i)
       plotMenu->addAction(QString::number(i));
-    fileMenu->addAction("Status...");
+    QAction *statusAct = fileMenu->addAction("Status...");
+    connect(statusAct, &QAction::triggered, this, [this]() { showStatus(); });
     fileMenu->addSeparator();
-    fileMenu->addAction("Quit");
+    QAction *quitAct = fileMenu->addAction("Quit");
+    connect(quitAct, &QAction::triggered, this, &QWidget::close);
 
     QMenu *optionsMenu = menuBar()->addMenu("Options");
     QMenu *epicsMenu = optionsMenu->addMenu("EPICS");
@@ -791,6 +798,10 @@ public:
 private:
   QString customDirectory;
   QString pvFilename;
+  QString latFilename;
+  QString refFilename;
+  QString saveTime[NSAVE];
+  QString saveFilename[NSAVE];
   QVector<ArrayData> arrays;
   QVector<AreaData> areas;
   QVector<AreaWidget *> areaWidgets;
@@ -798,6 +809,9 @@ private:
   QTimer *pollTimer = nullptr;
   int timeInterval = 2000;
   bool caStarted = false;
+  double nstat = 0.0;
+  double nstatTime = 0.0;
+  int nsymbols = 0;
 
   void resetGraph()
   {
@@ -838,8 +852,61 @@ private:
         arr.avg = arr.sdev = arr.maxVal = 0.0;
       }
     }
+    nstat += 1.0;
+    nstatTime += timeInterval;
+    for (ArrayData &arr : arrays) {
+      arr.runSdev += arr.sdev;
+      arr.runAvg += arr.avg;
+      if (std::fabs(arr.maxVal) > std::fabs(arr.runMax))
+        arr.runMax = arr.maxVal;
+    }
     for (auto aw : areaWidgets)
       aw->refresh();
+  }
+
+  void showStatus()
+  {
+    time_t now = std::time(nullptr);
+    char tbuf[26];
+    std::strncpy(tbuf, std::ctime(&now), 24);
+    tbuf[24] = '\0';
+
+    QString msg;
+    msg += QString::asprintf("Time:         %s\n", tbuf);
+    msg += QString::asprintf("PV file:      %s\n", pvFilename.toUtf8().constData());
+    msg += QString::asprintf("Lattice file: %s\n", latFilename.toUtf8().constData());
+    msg += QString::asprintf("Reference file: %s\n\n", refFilename.toUtf8().constData());
+    msg += QString::asprintf(
+      "Accumulated History Time (min): %.1f    Nsymbols=%d\n",
+      nstatTime / 60000.0, nsymbols);
+    msg += "Array Nvals    SDEV     AVG     MAX (Accumulated)\n";
+    for (const ArrayData &arr : arrays) {
+      msg += QString::asprintf("%5d %5d % 7.3f % 7.3f %7.3f\n",
+        arr.index + 1, arr.nvals,
+        nstat > 0 ? arr.runSdev / nstat : 0.0,
+        nstat > 0 ? arr.runAvg / nstat : 0.0,
+        arr.runMax);
+    }
+    msg += "\nSlot  Time                      File\n";
+    for (int i = 0; i < NSAVE; ++i) {
+      QByteArray st = saveTime[i].toUtf8();
+      QByteArray sf = saveFilename[i].toUtf8();
+      msg += QString::asprintf("%3d   %.24s  %s\n", i + 1,
+        st.constData(), sf.constData());
+    }
+
+    QDialog dlg(this);
+    dlg.setWindowTitle("Status");
+    QVBoxLayout layout(&dlg);
+    QLabel label(msg);
+    QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    label.setFont(font);
+    label.setTextInteractionFlags(Qt::TextSelectableByMouse);
+    layout.addWidget(&label);
+    QDialogButtonBox buttons(QDialogButtonBox::Ok);
+    connect(&buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    layout.addWidget(&buttons);
+    dlg.exec();
   }
 
   bool writePlotFile(const QString &filename)
@@ -933,6 +1000,12 @@ private:
     arrays.clear();
     areas.clear();
     areaWidgets.clear();
+    nstat = 0.0;
+    nstatTime = 0.0;
+    for (int i = 0; i < NSAVE; ++i) {
+      saveTime[i].clear();
+      saveFilename[i].clear();
+    }
 
     if (ca_context_create(ca_disable_preemptive_callback) != ECA_NORMAL) {
       QMessageBox::warning(this, "ADT", "Unable to start Channel Access");
@@ -1128,7 +1201,12 @@ private:
       } else {
         arr.avg = arr.sdev = arr.maxVal = 0.0;
       }
+      arr.runSdev = 0.0;
+      arr.runAvg = 0.0;
+      arr.runMax = 0.0;
     }
+
+    nsymbols = channels.size();
 
     QWidget *central = new QWidget;
     QVBoxLayout *layout = new QVBoxLayout(central);
