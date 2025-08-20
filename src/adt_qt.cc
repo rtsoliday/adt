@@ -1015,7 +1015,7 @@ private:
       QMessageBox::warning(this, "ADT", "There are no PV's defined");
       return;
     }
-    QString dir = QFileInfo(pvFilename).absolutePath();
+    QString dir = QDir::currentPath();
     QString fn = QFileDialog::getSaveFileName(this, "Write Snapshot File",
       dir, "Snapshot Files (*.snap)");
     if (fn.isEmpty())
