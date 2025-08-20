@@ -70,6 +70,7 @@ static constexpr int NCOLORS = sizeof(defaultColors) / sizeof(defaultColors[0]);
 
 static bool markers = true;
 static bool lines = true;
+static bool bars = false;
 static bool grid = true;
 
 struct AreaData
@@ -285,7 +286,15 @@ protected:
         continue;
       double xstep = arr->nvals > 1 ? plotRect.width() /
         static_cast<double>(arr->nvals - 1) : 0.0;
-      if (lines) {
+      int y0 = mapY(area->centerVal);
+      if (bars) {
+        p.setPen(arr->color);
+        for (int i = 0; i < arr->nvals; ++i) {
+          int x = plotRect.left() + static_cast<int>(i * xstep);
+          int y = mapY(arr->vals[i]);
+          p.drawLine(x, y0, x, y);
+        }
+      } else if (lines) {
         p.setPen(arr->color);
         QPainterPath path;
         path.moveTo(plotRect.left(), mapY(arr->vals[0]));
@@ -665,6 +674,13 @@ public:
     });
     QAction *barsAct = viewMenu->addAction("Bars");
     barsAct->setCheckable(true);
+    barsAct->setChecked(bars);
+    connect(barsAct, &QAction::toggled, this, [this](bool checked)
+    {
+      bars = checked;
+      for (auto aw : areaWidgets)
+        aw->refresh();
+    });
     QAction *gridAct = viewMenu->addAction("Grid");
     gridAct->setCheckable(true);
     gridAct->setChecked(grid);
