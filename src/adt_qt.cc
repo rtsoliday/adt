@@ -23,6 +23,8 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QPainter>
+#include <QVBoxLayout>
+#include <QPainterPath>
 #include <QMessageBox>
 #include <QString>
 #include <QWidget>
@@ -76,6 +78,7 @@ struct ArrayData
   QVector<double> minVals;
   QVector<double> maxVals;
   QVector<bool> conn;
+  QVector<chid> chids;
   QString heading;
   QString units;
   double scaleFactor = 1.0;
@@ -211,6 +214,81 @@ protected:
     drawCentered("Please Send Comments and Bugs to soliday@anl.gov",
       ystart + 3 * linespacing);
   }
+};
+
+/**
+ * @brief Widget for displaying a single ADT plotting area.
+ */
+class AreaWidget : public QWidget
+{
+public:
+  AreaWidget(AreaData *adata, const QVector<ArrayData *> &arrays,
+    QWidget *parent = nullptr)
+    : QWidget(parent), area(adata), arrayPtrs(arrays)
+  {
+    setMinimumSize(800, 150);
+  }
+
+protected:
+  void paintEvent(QPaintEvent *) override
+  {
+    QPainter p(this);
+    p.fillRect(rect(), Qt::white);
+
+    int w = width();
+    int h = height();
+    int headerHeight = 20;
+    QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
+
+    p.setPen(Qt::black);
+    p.drawRect(plotRect);
+
+    for (int i = 1; i < GRIDDIVISIONS; ++i) {
+      int x = plotRect.left() + i * plotRect.width() / GRIDDIVISIONS;
+      int y = plotRect.top() + i * plotRect.height() / GRIDDIVISIONS;
+      p.drawLine(plotRect.left(), y, plotRect.right(), y);
+      p.drawLine(x, plotRect.top(), x, plotRect.bottom());
+    }
+
+    double upd = scale[area->currScale];
+    double ymin = area->centerVal - upd * GRIDDIVISIONS;
+    double ymax = area->centerVal + upd * GRIDDIVISIONS;
+
+    auto mapY = [&](double v) {
+      if (v > ymax)
+        v = ymax;
+      if (v < ymin)
+        v = ymin;
+      double frac = (v - ymin) / (ymax - ymin);
+      return plotRect.bottom() - static_cast<int>(frac * plotRect.height());
+    };
+
+    for (auto arr : arrayPtrs) {
+      if (arr->nvals < 1)
+        continue;
+      p.setPen(arr->color);
+      double xstep = arr->nvals > 1 ? plotRect.width() /
+        static_cast<double>(arr->nvals - 1) : 0.0;
+      QPainterPath path;
+      path.moveTo(plotRect.left(), mapY(arr->vals[0]));
+      for (int i = 1; i < arr->nvals; ++i)
+        path.lineTo(plotRect.left() + static_cast<int>(i * xstep),
+          mapY(arr->vals[i]));
+      p.drawPath(path);
+    }
+
+    QString head = arrayPtrs[0]->heading;
+    if (!arrayPtrs[0]->units.isEmpty())
+      head += QString(" (%1)").arg(arrayPtrs[0]->units);
+    QString info = QString("  %1 /div  Center: %2")
+      .arg(scale[area->currScale], 0, 'f', 3)
+      .arg(area->centerVal, 0, 'f', 3);
+    p.drawText(5, 15, head + info);
+  }
+
+private:
+  AreaData *area;
+  QVector<ArrayData *> arrayPtrs;
 };
 
 class MainWindow : public QMainWindow
@@ -508,6 +586,7 @@ private:
       arr.minVals.fill(LARGEVAL, rows);
       arr.maxVals.fill(-LARGEVAL, rows);
       arr.conn.fill(false, rows);
+      arr.chids.clear();
 
       char **names = (char **)SDDS_GetColumn(&table, const_cast<char *>("ControlName"));
       if (!names) {
@@ -521,8 +600,12 @@ private:
         arr.names.append(names[i]);
         chid ch;
         int status = ca_create_channel(names[i], NULL, NULL, 0, &ch);
-        if (status == ECA_NORMAL)
+        if (status == ECA_NORMAL) {
           channels.append(ch);
+          arr.chids.append(ch);
+        } else {
+          arr.chids.append(0);
+        }
         SDDS_Free(names[i]);
       }
       SDDS_Free(names);
@@ -532,6 +615,27 @@ private:
 
     if (ca_pend_io(5.0) == ECA_TIMEOUT)
       QMessageBox::warning(this, "ADT", "Timeout connecting to PVs");
+
+    for (ArrayData &arr : arrays) {
+      for (int i = 0; i < arr.nvals; ++i)
+        ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
+    }
+    ca_pend_io(5.0);
+
+    QWidget *central = new QWidget;
+    QVBoxLayout *layout = new QVBoxLayout(central);
+    for (AreaData &area : areas) {
+      QVector<ArrayData *> arrs;
+      for (ArrayData &arr : arrays) {
+        if (arr.area == &area)
+          arrs.append(&arr);
+      }
+      if (!arrs.isEmpty()) {
+        auto aw = new AreaWidget(&area, arrs, central);
+        layout->addWidget(aw);
+      }
+    }
+    setCentralWidget(central);
 
     setWindowTitle("ADT - " + QFileInfo(file).fileName());
     QMessageBox::information(this, "ADT",
