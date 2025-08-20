@@ -252,13 +252,6 @@ protected:
     p.setPen(Qt::black);
     p.drawRect(plotRect);
 
-    for (int i = 1; i < GRIDDIVISIONS; ++i) {
-      int x = plotRect.left() + i * plotRect.width() / GRIDDIVISIONS;
-      int y = plotRect.top() + i * plotRect.height() / GRIDDIVISIONS;
-      p.drawLine(plotRect.left(), y, plotRect.right(), y);
-      p.drawLine(x, plotRect.top(), x, plotRect.bottom());
-    }
-
     double upd = scale[area->currScale];
     double ymin = area->centerVal - upd * GRIDDIVISIONS;
     double ymax = area->centerVal + upd * GRIDDIVISIONS;
@@ -271,6 +264,13 @@ protected:
       double frac = (v - ymin) / (ymax - ymin);
       return plotRect.bottom() - static_cast<int>(frac * plotRect.height());
     };
+
+    p.setPen(Qt::gray);
+    for (int i = -GRIDDIVISIONS; i <= GRIDDIVISIONS; ++i) {
+      int y = mapY(area->centerVal + i * upd);
+      p.drawLine(plotRect.left(), y, plotRect.right(), y);
+    }
+    p.setPen(Qt::black);
 
     for (auto arr : arrayPtrs) {
       if (arr->nvals < 1)
