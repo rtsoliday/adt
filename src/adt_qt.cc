@@ -463,7 +463,7 @@ public:
 
     plot = new PlotWidget(adata, arrays, this);
     vbox->addWidget(plot, 1);
-    int plotHeight = 150 + 1;
+    int plotHeight = 160 + 1;
     plot->setMinimumHeight(plotHeight);
     int topHeight = controls->sizeHint().height() + titleBox->sizeHint().height();
     setMinimumHeight(plotHeight + topHeight);
