@@ -33,6 +33,7 @@
 #include <QList>
 #include <QVector>
 #include <QColor>
+#include <QTimer>
 #include <limits>
 #include <cmath>
 #include <cstring>
@@ -382,6 +383,12 @@ public:
     setMinimumSize(800, 150);
   }
 
+  void refresh()
+  {
+    updateStats();
+    plot->update();
+  }
+
 private:
   void updateStats()
   {
@@ -413,6 +420,8 @@ public:
     constexpr int NSAVE = 5;
     auto logo = new LogoWidget(this);
     setCentralWidget(logo);
+    pollTimer = new QTimer(this);
+    connect(pollTimer, &QTimer::timeout, this, [this]() { pollPvUpdate(); });
 
     QMenu *fileMenu = menuBar()->addMenu("File");
     QString adtHome = qEnvironmentVariable("ADTHOME", ".");
@@ -540,6 +549,8 @@ public:
       ca_clear_channel(ch);
     if (caStarted)
       ca_context_destroy();
+    if (pollTimer)
+      pollTimer->stop();
   }
 
 private:
@@ -547,12 +558,55 @@ private:
   QString pvFilename;
   QVector<ArrayData> arrays;
   QVector<AreaData> areas;
+  QVector<AreaWidget *> areaWidgets;
   QVector<chid> channels;
+  QTimer *pollTimer = nullptr;
+  int timeInterval = 2000;
   bool caStarted = false;
+
+  void pollPvUpdate()
+  {
+    if (!caStarted)
+      return;
+    ca_poll();
+    for (ArrayData &arr : arrays) {
+      for (int i = 0; i < arr.nvals; ++i)
+        ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
+    }
+    ca_pend_io(5.0);
+    for (ArrayData &arr : arrays) {
+      double sum = 0.0;
+      double sumsq = 0.0;
+      double maxv = 0.0;
+      for (int i = 0; i < arr.nvals; ++i) {
+        double v = arr.vals[i];
+        sum += v;
+        sumsq += v * v;
+        if (i == 0 || std::fabs(v) > std::fabs(maxv))
+          maxv = v;
+        if (v < arr.minVals[i])
+          arr.minVals[i] = v;
+        if (v > arr.maxVals[i])
+          arr.maxVals[i] = v;
+      }
+      if (arr.nvals > 0) {
+        arr.avg = sum / arr.nvals;
+        arr.sdev = std::sqrt(sumsq / arr.nvals - arr.avg * arr.avg);
+        arr.maxVal = maxv;
+      } else {
+        arr.avg = arr.sdev = arr.maxVal = 0.0;
+      }
+    }
+    for (auto aw : areaWidgets)
+      aw->refresh();
+  }
 
   void loadPvFile(const QString &file)
   {
     pvFilename = file;
+    if (pollTimer)
+      pollTimer->stop();
+    timeInterval = 2000;
 
     if (caStarted) {
       for (chid ch : channels)
@@ -564,6 +618,7 @@ private:
 
     arrays.clear();
     areas.clear();
+    areaWidgets.clear();
 
     if (ca_context_create(ca_disable_preemptive_callback) != ECA_NORMAL) {
       QMessageBox::warning(this, "ADT", "Unable to start Channel Access");
@@ -619,6 +674,9 @@ private:
         nareas = templong;
         arrays.resize(narrays);
         areas.resize(nareas);
+        if (SDDS_GetParameterAsLong(&table,
+            const_cast<char *>("ADTTimeInterval"), &templong))
+          timeInterval = static_cast<int>(templong);
         first = false;
       }
 
@@ -746,6 +804,8 @@ private:
         sumsq += v * v;
         if (i == 0 || std::fabs(v) > std::fabs(maxv))
           maxv = v;
+        arr.minVals[i] = v;
+        arr.maxVals[i] = v;
       }
       if (arr.nvals > 0) {
         arr.avg = sum / arr.nvals;
@@ -767,6 +827,7 @@ private:
       if (!arrs.isEmpty()) {
         auto aw = new AreaWidget(&area, arrs, central);
         layout->addWidget(aw);
+        areaWidgets.append(aw);
       }
     }
     setCentralWidget(central);
@@ -774,6 +835,7 @@ private:
     setWindowTitle("ADT - " + QFileInfo(file).fileName());
     QMessageBox::information(this, "ADT",
       QString("Loaded %1 PVs from:\n%2").arg(channels.size()).arg(file));
+    pollTimer->start(timeInterval);
   }
 };
 
