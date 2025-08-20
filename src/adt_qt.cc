@@ -27,6 +27,7 @@
 #include <QHBoxLayout>
 #include <QPainterPath>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QDoubleSpinBox>
 #include <QString>
 #include <QWidget>
@@ -287,6 +288,47 @@ protected:
     if (!arrayPtrs[0]->units.isEmpty())
       head += QString(" (%1)").arg(arrayPtrs[0]->units);
     p.drawText(5, 15, head);
+  }
+
+  void mousePressEvent(QMouseEvent *event) override
+  {
+    if (event->button() == Qt::LeftButton) {
+      int w = width();
+      int h = height();
+      int headerHeight = 20;
+      QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
+      if (!plotRect.contains(event->pos()) || arrayPtrs.isEmpty()) {
+        QWidget::mousePressEvent(event);
+        return;
+      }
+      int nvals = arrayPtrs[0]->nvals;
+      if (nvals < 1) {
+        QWidget::mousePressEvent(event);
+        return;
+      }
+      double xstep = nvals > 1 ? plotRect.width() /
+        static_cast<double>(nvals - 1) : 0.0;
+      int nmid = static_cast<int>((event->pos().x() - plotRect.left()) /
+        xstep + 0.5);
+      QString info;
+      for (auto arr : arrayPtrs) {
+        info += arr->heading + "\n";
+        for (int idx = nmid - 1; idx <= nmid + 1; ++idx) {
+          if (idx >= 0 && idx < arr->nvals) {
+            double val = arr->scaleFactor * arr->vals[idx];
+            QString line = QString("%1%2 %3  %4\n")
+              .arg(idx == nmid ? "->" : "  ")
+              .arg(idx + 1)
+              .arg(arr->names[idx])
+              .arg(val, 7, 'f', 3);
+            info += line;
+          }
+        }
+      }
+      QMessageBox::information(this, "Information", info);
+    } else {
+      QWidget::mousePressEvent(event);
+    }
   }
 
 private:
