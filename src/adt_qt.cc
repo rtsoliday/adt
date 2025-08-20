@@ -246,7 +246,7 @@ protected:
 
     int w = width();
     int h = height();
-    int headerHeight = 20;
+    int headerHeight = 0;
     QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
 
     p.setPen(Qt::black);
@@ -285,11 +285,6 @@ protected:
           mapY(arr->vals[i]));
       p.drawPath(path);
     }
-
-    QString head = arrayPtrs[0]->heading;
-    if (!arrayPtrs[0]->units.isEmpty())
-      head += QString(" (%1)").arg(arrayPtrs[0]->units);
-    p.drawText(5, 15, head);
   }
 
   void mousePressEvent(QMouseEvent *event) override
@@ -297,7 +292,7 @@ protected:
     if (event->button() == Qt::LeftButton) {
       int w = width();
       int h = height();
-      int headerHeight = 20;
+      int headerHeight = 0;
       QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
       if (!plotRect.contains(event->pos()) || arrayPtrs.isEmpty()) {
         QWidget::mousePressEvent(event);
@@ -345,7 +340,7 @@ protected:
     if (event->button() == Qt::LeftButton && infoBox) {
       int w = width();
       int h = height();
-      int headerHeight = 20;
+      int headerHeight = 0;
       QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
       if (plotRect.contains(event->pos()))
         infoBox->close();
@@ -370,16 +365,49 @@ class AreaWidget : public QWidget
 public:
   AreaWidget(AreaData *adata, const QVector<ArrayData *> &arrays,
     QWidget *parent = nullptr)
-    : QWidget(parent), area(adata),
-      primaryArray(arrays.isEmpty() ? nullptr : arrays[0])
+    : QWidget(parent), area(adata), arrayPtrs(arrays)
   {
     auto vbox = new QVBoxLayout(this);
     vbox->setContentsMargins(0, 0, 0, 0);
-    auto top = new QHBoxLayout;
-    vbox->addLayout(top);
+
+    auto titleBox = new QVBoxLayout;
+    vbox->addLayout(titleBox);
+    for (auto arr : arrayPtrs) {
+      auto row = new QHBoxLayout;
+      titleBox->addLayout(row);
+      auto colorLabel = new QLabel;
+      colorLabel->setFixedSize(12, 12);
+      colorLabel->setStyleSheet(QString("background-color:%1;")
+        .arg(arr->color.name()));
+      row->addWidget(colorLabel);
+      auto headLabel = new QLabel;
+      QString head = arr->heading;
+      if (!arr->units.isEmpty())
+        head += QString(" (%1)").arg(arr->units);
+      headLabel->setText(head);
+      row->addWidget(headLabel);
+      row->addStretch();
+      auto sdevText = new QLabel("SDEV:");
+      row->addWidget(sdevText);
+      auto sdevLabel = new QLabel;
+      row->addWidget(sdevLabel);
+      auto avgText = new QLabel("    AVG:");
+      row->addWidget(avgText);
+      auto avgLabel = new QLabel;
+      row->addWidget(avgLabel);
+      auto maxText = new QLabel("    MAX:");
+      row->addWidget(maxText);
+      auto maxLabel = new QLabel;
+      row->addWidget(maxLabel);
+      StatLabels sl{ sdevLabel, avgLabel, maxLabel };
+      stats.append(sl);
+    }
+
+    auto controls = new QHBoxLayout;
+    vbox->addLayout(controls);
 
     auto scaleLabel = new QLabel("Scale:");
-    top->addWidget(scaleLabel);
+    controls->addWidget(scaleLabel);
     scaleSpin = new QDoubleSpinBox;
     scaleSpin->setDecimals(3);
     scaleSpin->setRange(scale[0], scale[NSCALES - 1]);
@@ -388,37 +416,23 @@ public:
       scale[area->currScale] - scale[area->currScale - 1] :
       (NSCALES > 1 ? scale[1] - scale[0] : scale[0]);
     scaleSpin->setSingleStep(step);
-    top->addWidget(scaleSpin);
+    controls->addWidget(scaleSpin);
 
     auto centerLabel = new QLabel("Center:");
-    top->addWidget(centerLabel);
+    controls->addWidget(centerLabel);
     centerSpin = new QDoubleSpinBox;
     centerSpin->setDecimals(3);
     centerSpin->setRange(-LARGEVAL, LARGEVAL);
     centerSpin->setValue(area->centerVal);
-    top->addWidget(centerSpin);
-    top->addStretch();
-
-    auto sdevText = new QLabel("SDEV:");
-    top->addWidget(sdevText);
-    sdevLabel = new QLabel;
-    top->addWidget(sdevLabel);
-
-    auto avgText = new QLabel("    AVG:");
-    top->addWidget(avgText);
-    avgLabel = new QLabel;
-    top->addWidget(avgLabel);
-
-    auto maxText = new QLabel("    MAX:");
-    top->addWidget(maxText);
-    maxLabel = new QLabel;
-    top->addWidget(maxLabel);
+    controls->addWidget(centerSpin);
+    controls->addStretch();
 
     plot = new PlotWidget(adata, arrays, this);
     vbox->addWidget(plot, 1);
-    int plotHeight = 150 + 20 + 1;
+    int plotHeight = 150 + 1;
     plot->setMinimumHeight(plotHeight);
-    setMinimumHeight(plotHeight + top->sizeHint().height());
+    int topHeight = controls->sizeHint().height() + titleBox->sizeHint().height();
+    setMinimumHeight(plotHeight + topHeight);
 
     connect(scaleSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
       this, [this](double val)
@@ -463,24 +477,31 @@ public:
 private:
   void updateStats()
   {
-    if (!primaryArray)
-      return;
-    sdevLabel->setText(QString("%1").arg(
-      primaryArray->sdev * primaryArray->scaleFactor, 0, 'f', 3));
-    avgLabel->setText(QString("%1").arg(
-      primaryArray->avg * primaryArray->scaleFactor, 0, 'f', 3));
-    maxLabel->setText(QString("%1").arg(
-      primaryArray->maxVal * primaryArray->scaleFactor, 0, 'f', 3));
+    for (int i = 0; i < arrayPtrs.size() && i < stats.size(); ++i) {
+      auto arr = arrayPtrs[i];
+      auto sl = stats[i];
+      sl.sdev->setText(QString("%1").arg(
+        arr->sdev * arr->scaleFactor, 0, 'f', 3));
+      sl.avg->setText(QString("%1").arg(
+        arr->avg * arr->scaleFactor, 0, 'f', 3));
+      sl.max->setText(QString("%1").arg(
+        arr->maxVal * arr->scaleFactor, 0, 'f', 3));
+    }
   }
 
+  struct StatLabels
+  {
+    QLabel *sdev;
+    QLabel *avg;
+    QLabel *max;
+  };
+
   AreaData *area;
-  ArrayData *primaryArray;
+  QVector<ArrayData *> arrayPtrs;
   PlotWidget *plot;
   QDoubleSpinBox *scaleSpin;
   QDoubleSpinBox *centerSpin;
-  QLabel *sdevLabel;
-  QLabel *avgLabel;
-  QLabel *maxLabel;
+  QVector<StatLabels> stats;
 };
 
 class MainWindow : public QMainWindow
