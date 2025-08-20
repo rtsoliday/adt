@@ -310,6 +310,10 @@ public:
     scaleSpin->setDecimals(3);
     scaleSpin->setRange(scale[0], scale[NSCALES - 1]);
     scaleSpin->setValue(scale[area->currScale]);
+    double step = (area->currScale > 0) ?
+      scale[area->currScale] - scale[area->currScale - 1] :
+      (NSCALES > 1 ? scale[1] - scale[0] : scale[0]);
+    scaleSpin->setSingleStep(step);
     top->addWidget(scaleSpin);
 
     auto centerLabel = new QLabel("Center:");
@@ -337,6 +341,10 @@ public:
       area->xmin = area->centerVal - scale[iscale] * GRIDDIVISIONS;
       scaleSpin->blockSignals(true);
       scaleSpin->setValue(scale[iscale]);
+      double step = (iscale > 0) ?
+        scale[iscale] - scale[iscale - 1] :
+        (NSCALES > 1 ? scale[1] - scale[0] : scale[0]);
+      scaleSpin->setSingleStep(step);
       scaleSpin->blockSignals(false);
       plot->update();
     });
