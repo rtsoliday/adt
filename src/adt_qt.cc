@@ -40,10 +40,14 @@
 #include <QInputDialog>
 #include <QPointer>
 #include <QPixmap>
+#include <QProcess>
+#include <QTemporaryFile>
 #include <limits>
 #include <cmath>
 #include <cstring>
 #include <cstdint>
+#include <cstdio>
+#include <ctime>
 
 #include <SDDS.h>
 #include <QDir>
@@ -54,6 +58,7 @@
 static constexpr int GRIDDIVISIONS = 5;
 static const char *PVID = "ADTPV";
 static constexpr double LARGEVAL = 1e40;
+static const char *SDDSID = "SDDS1";
 
 static const double scale[] = {
   0.001, 0.002, 0.005, 0.010, 0.020, 0.050, 0.100, 0.200, 0.500,
@@ -619,7 +624,8 @@ public:
     for (int i = 1; i <= NSAVE; ++i)
       writeMenu->addAction(QString::number(i));
     QMenu *plotMenu = fileMenu->addMenu("Plot");
-    plotMenu->addAction("Current");
+    QAction *plotCurAct = plotMenu->addAction("Current");
+    connect(plotCurAct, &QAction::triggered, this, [this]() { plotCurrent(); });
     for (int i = 1; i <= NSAVE; ++i)
       plotMenu->addAction(QString::number(i));
     fileMenu->addAction("Status...");
@@ -834,6 +840,79 @@ private:
     }
     for (auto aw : areaWidgets)
       aw->refresh();
+  }
+
+  bool writePlotFile(const QString &filename)
+  {
+    FILE *file = fopen(filename.toUtf8().constData(), "w");
+    if (!file)
+      return false;
+
+    time_t now = std::time(nullptr);
+    char tbuf[26];
+    std::strncpy(tbuf, std::ctime(&now), 24);
+    tbuf[24] = '\0';
+
+    fprintf(file, "%s\n", SDDSID);
+    fprintf(file, "&description text=\"ADT Plot from %s\" &end\n",
+      pvFilename.toUtf8().constData());
+    fprintf(file,
+      "&parameter name=TimeStamp fixed_value=\"%s\" type=string &end\n",
+      tbuf);
+    fprintf(file,
+      "&parameter name=ADTNArrays type=short fixed_value=%d &end\n",
+      arrays.size() + 1);
+    fprintf(file,
+      "&parameter name=ADTNAreas type=short fixed_value=%d &end\n",
+      areas.size() + 1);
+    fprintf(file, "&parameter name=ADTHeading type=string &end\n");
+    fprintf(file, "&parameter name=ADTUnits type=string &end\n");
+    fprintf(file, "&parameter name=ADTScreenTitle type=string &end\n");
+    fprintf(file, "&parameter name=ADTDisplayArea type=short &end\n");
+    fprintf(file, "&column name=Index type=short &end\n");
+    fprintf(file, "&column name=ControlName type=string &end\n");
+    fprintf(file, "&column name=Value type=double &end\n");
+    fprintf(file,
+      "&data mode=ascii no_row_counts=1 additional_header_lines=1 &end\n");
+    for (const ArrayData &arr : arrays) {
+      fprintf(file, "\n");
+      fprintf(file, "%s\n", arr.heading.toUtf8().constData());
+      fprintf(file, "%s\n", arr.units.toUtf8().constData());
+      fprintf(file, "%s (%s)\n", arr.heading.toUtf8().constData(),
+        arr.units.toUtf8().constData());
+      fprintf(file, "%d     !ADTDisplayArea\n", arr.area->index + 1);
+      for (int i = 0; i < arr.nvals; ++i) {
+        fprintf(file, "%d %s % f\n", i + 1,
+          arr.names[i].toUtf8().constData(), arr.vals[i]);
+      }
+    }
+    fclose(file);
+    return true;
+  }
+
+  void plotCurrent()
+  {
+    if (arrays.isEmpty()) {
+      QMessageBox::warning(this, "ADT", "There are no PV's defined");
+      return;
+    }
+    QTemporaryFile tmp(QDir::tempPath() + "/ADTPlotXXXXXX.sdds");
+    tmp.setAutoRemove(false);
+    if (!tmp.open()) {
+      QMessageBox::warning(this, "ADT", "Unable to create temp file");
+      return;
+    }
+    QString fname = tmp.fileName();
+    tmp.close();
+    if (!writePlotFile(fname)) {
+      QFile::remove(fname);
+      return;
+    }
+    QString cmd = QString(
+      "sddsplot -graph=sym,connect -layout=1,2 -split=page -sep "
+      "-ylabel=@TimeStamp -xlabel=Index -column=Index,Value \"%1\" "
+      "-title=@ADTScreenTitle -end ; rm \"%1\"").arg(fname);
+    QProcess::startDetached("/bin/sh", QStringList() << "-c" << cmd);
   }
 
   void loadPvFile(const QString &file)
