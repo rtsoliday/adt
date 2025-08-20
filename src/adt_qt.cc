@@ -66,6 +66,10 @@ static const char *defaultColors[] = {
 };
 static constexpr int NCOLORS = sizeof(defaultColors) / sizeof(defaultColors[0]);
 
+static bool markers = true;
+static bool lines = true;
+static bool grid = true;
+
 struct AreaData
 {
   int index = 0;
@@ -265,25 +269,39 @@ protected:
       return plotRect.bottom() - static_cast<int>(frac * plotRect.height());
     };
 
-    p.setPen(Qt::gray);
-    for (int i = -GRIDDIVISIONS; i <= GRIDDIVISIONS; ++i) {
-      int y = mapY(area->centerVal + i * upd);
-      p.drawLine(plotRect.left(), y, plotRect.right(), y);
+    if (grid) {
+      p.setPen(Qt::gray);
+      for (int i = -GRIDDIVISIONS; i <= GRIDDIVISIONS; ++i) {
+        int y = mapY(area->centerVal + i * upd);
+        p.drawLine(plotRect.left(), y, plotRect.right(), y);
+      }
     }
     p.setPen(Qt::black);
 
     for (auto arr : arrayPtrs) {
       if (arr->nvals < 1)
         continue;
-      p.setPen(arr->color);
       double xstep = arr->nvals > 1 ? plotRect.width() /
         static_cast<double>(arr->nvals - 1) : 0.0;
-      QPainterPath path;
-      path.moveTo(plotRect.left(), mapY(arr->vals[0]));
-      for (int i = 1; i < arr->nvals; ++i)
-        path.lineTo(plotRect.left() + static_cast<int>(i * xstep),
-          mapY(arr->vals[i]));
-      p.drawPath(path);
+      if (lines) {
+        p.setPen(arr->color);
+        QPainterPath path;
+        path.moveTo(plotRect.left(), mapY(arr->vals[0]));
+        for (int i = 1; i < arr->nvals; ++i)
+          path.lineTo(plotRect.left() + static_cast<int>(i * xstep),
+            mapY(arr->vals[i]));
+        p.drawPath(path);
+      }
+      if (markers) {
+        p.setPen(arr->color);
+        p.setBrush(arr->color);
+        for (int i = 0; i < arr->nvals; ++i) {
+          int x = plotRect.left() + static_cast<int>(i * xstep);
+          int y = mapY(arr->vals[i]);
+          p.drawRect(x - 1, y - 1, 3, 3);
+        }
+        p.setBrush(Qt::NoBrush);
+      }
     }
   }
 
@@ -608,12 +626,33 @@ public:
     viewMenu->addAction("Timing...");
     QAction *markersAct = viewMenu->addAction("Markers");
     markersAct->setCheckable(true);
+    markersAct->setChecked(markers);
+    connect(markersAct, &QAction::toggled, this, [this](bool checked)
+    {
+      markers = checked;
+      for (auto aw : areaWidgets)
+        aw->refresh();
+    });
     QAction *linesAct = viewMenu->addAction("Lines");
     linesAct->setCheckable(true);
+    linesAct->setChecked(lines);
+    connect(linesAct, &QAction::toggled, this, [this](bool checked)
+    {
+      lines = checked;
+      for (auto aw : areaWidgets)
+        aw->refresh();
+    });
     QAction *barsAct = viewMenu->addAction("Bars");
     barsAct->setCheckable(true);
     QAction *gridAct = viewMenu->addAction("Grid");
     gridAct->setCheckable(true);
+    gridAct->setChecked(grid);
+    connect(gridAct, &QAction::toggled, this, [this](bool checked)
+    {
+      grid = checked;
+      for (auto aw : areaWidgets)
+        aw->refresh();
+    });
     QAction *maxminAct = viewMenu->addAction("Max/Min");
     maxminAct->setCheckable(true);
     QAction *fillAct = viewMenu->addAction("Filled Max/Min");
