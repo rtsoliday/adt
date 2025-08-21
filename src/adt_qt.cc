@@ -109,6 +109,7 @@ struct ArrayData
   QVector<double> maxVals;
   QVector<bool> conn;
   QVector<chid> chids;
+  bool zoom = false;
   QString heading;
   QString units;
   double scaleFactor = 1.0;
@@ -719,8 +720,15 @@ public:
     checkMenu->addAction("Check All");
     QAction *refAct = optionsMenu->addAction("Reference Enabled");
     refAct->setCheckable(true);
-    QAction *zoomAct = optionsMenu->addAction("Zoom Enabled");
+    zoomAct = optionsMenu->addAction("Zoom Enabled");
     zoomAct->setCheckable(true);
+    zoomAct->setChecked(zoomOn);
+    connect(zoomAct, &QAction::toggled, this, [this](bool checked)
+    {
+      zoomOn = checked;
+      if (zoomWidget)
+        zoomWidget->setVisible(zoomOn);
+    });
     QAction *statAct = optionsMenu->addAction("Accumulated Statistics");
     statAct->setCheckable(true);
     optionsMenu->addAction("Reset Max/Min");
@@ -876,6 +884,10 @@ private:
   QVector<ArrayData> arrays;
   QVector<AreaData> areas;
   QVector<AreaWidget *> areaWidgets;
+  AreaWidget *zoomWidget = nullptr;
+  QAction *zoomAct = nullptr;
+  AreaData zoomArea;
+  bool zoomOn = true;
   QVector<chid> channels;
   QTimer *pollTimer = nullptr;
   int timeInterval = 2000;
@@ -1135,6 +1147,7 @@ private:
     arrays.clear();
     areas.clear();
     areaWidgets.clear();
+    zoomWidget = nullptr;
     nstat = 0.0;
     nstatTime = 0.0;
     for (int i = 0; i < NSAVE; ++i) {
@@ -1239,6 +1252,12 @@ private:
         arr.scaleFactor = sf;
       else
         arr.scaleFactor = 1.0;
+
+      if (SDDS_GetParameterAsLong(&table,
+          const_cast<char *>("ADTZoomArea"), &templong))
+        arr.zoom = templong != 0;
+      else
+        arr.zoom = false;
 
       int iarea;
       if (oneAreaPerArray)
@@ -1356,6 +1375,30 @@ private:
         layout->addWidget(aw);
         areaWidgets.append(aw);
       }
+    }
+    QVector<ArrayData *> zarrs;
+    int maxScale = 0;
+    double avgCenter = 0.0;
+    for (ArrayData &arr : arrays) {
+      if (arr.zoom) {
+        zarrs.append(&arr);
+        avgCenter += arr.area->centerVal;
+        if (arr.area->currScale > maxScale)
+          maxScale = arr.area->currScale;
+      }
+    }
+    if (!zarrs.isEmpty()) {
+      zoomArea.currScale = maxScale;
+      zoomArea.centerVal = avgCenter / zarrs.size();
+      zoomArea.xmax = zoomArea.centerVal +
+        scale[zoomArea.currScale] * GRIDDIVISIONS;
+      zoomArea.xmin = zoomArea.centerVal -
+        scale[zoomArea.currScale] * GRIDDIVISIONS;
+      zoomArea.initialized = true;
+      zoomWidget = new AreaWidget(&zoomArea, zarrs, central);
+      layout->addWidget(zoomWidget);
+      areaWidgets.append(zoomWidget);
+      zoomWidget->setVisible(zoomOn);
     }
     setCentralWidget(central);
 
