@@ -47,6 +47,7 @@
 #include <QTemporaryFile>
 #include <limits>
 #include <cmath>
+#include <algorithm>
 #include <cstring>
 #include <cstdint>
 #include <cstdio>
@@ -97,6 +98,8 @@ struct AreaData
   bool initialized = false;
   bool tempclear = false;
   bool tempnodraw = false;
+  int xStart = 0;
+  int xEnd = -1;
 };
 
 struct ArrayData
@@ -122,6 +125,11 @@ struct ArrayData
   AreaData *area = nullptr;
   QColor color;
 };
+
+class PlotWidget;
+
+static PlotWidget *zoomPlot = nullptr;
+static AreaData *zoomAreaPtr = nullptr;
 
 struct LoadItem
 {
@@ -315,29 +323,40 @@ protected:
         if (arr->nvals < 1 || arr->minVals.size() != arr->nvals ||
             arr->maxVals.size() != arr->nvals)
           continue;
+        int start = area->xStart;
+        int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
+        if (start < 0)
+          start = 0;
+        if (end > arr->nvals)
+          end = arr->nvals;
+        int count = end - start;
+        if (count < 1)
+          continue;
         double xstep = plotRect.width() /
-          static_cast<double>(arr->nvals);
+          static_cast<double>(count);
         double xstart = plotRect.left() + xstep / 2.0;
         if (fillmaxmin) {
           QPainterPath path;
-          path.moveTo(xstart, mapY(arr->minVals[0]));
-          for (int i = 1; i < arr->nvals; ++i)
-            path.lineTo(xstart + i * xstep, mapY(arr->minVals[i]));
-          for (int i = arr->nvals - 1; i >= 0; --i)
-            path.lineTo(xstart + i * xstep, mapY(arr->maxVals[i]));
+          path.moveTo(xstart, mapY(arr->minVals[start]));
+          for (int i = start + 1; i < end; ++i)
+            path.lineTo(xstart + (i - start) * xstep, mapY(arr->minVals[i]));
+          for (int i = end - 1; i >= start; --i)
+            path.lineTo(xstart + (i - start) * xstep, mapY(arr->maxVals[i]));
           path.closeSubpath();
           pmap.fillPath(path, Qt::lightGray);
         } else {
           pmap.setPen(arr->color);
           QPainterPath pathMin;
-          pathMin.moveTo(xstart, mapY(arr->minVals[0]));
-          for (int i = 1; i < arr->nvals; ++i)
-            pathMin.lineTo(xstart + i * xstep, mapY(arr->minVals[i]));
+          pathMin.moveTo(xstart, mapY(arr->minVals[start]));
+          for (int i = start + 1; i < end; ++i)
+            pathMin.lineTo(xstart + (i - start) * xstep,
+              mapY(arr->minVals[i]));
           pmap.drawPath(pathMin);
           QPainterPath pathMax;
-          pathMax.moveTo(xstart, mapY(arr->maxVals[0]));
-          for (int i = 1; i < arr->nvals; ++i)
-            pathMax.lineTo(xstart + i * xstep, mapY(arr->maxVals[i]));
+          pathMax.moveTo(xstart, mapY(arr->maxVals[start]));
+          for (int i = start + 1; i < end; ++i)
+            pathMax.lineTo(xstart + (i - start) * xstep,
+              mapY(arr->maxVals[i]));
           pmap.drawPath(pathMax);
           pmap.setPen(Qt::black);
         }
@@ -357,29 +376,38 @@ protected:
     for (auto arr : arrayPtrs) {
       if (arr->nvals < 1)
         continue;
+      int start = area->xStart;
+      int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
+      if (start < 0)
+        start = 0;
+      if (end > arr->nvals)
+        end = arr->nvals;
+      int count = end - start;
+      if (count < 1)
+        continue;
       double xstep = plotRect.width() /
-        static_cast<double>(arr->nvals);
+        static_cast<double>(count);
       double xstart = plotRect.left() + xstep / 2.0; // add half-bin margin
       if (bars) {
         pmap.setPen(arr->color);
-        for (int i = 0; i < arr->nvals; ++i) {
-          int x = static_cast<int>(xstart + i * xstep);
+        for (int i = start; i < end; ++i) {
+          int x = static_cast<int>(xstart + (i - start) * xstep);
           int y = mapY(arr->vals[i]);
           pmap.drawLine(x, y0, x, y);
         }
       } else if (lines) {
         pmap.setPen(arr->color);
         QPainterPath path;
-        path.moveTo(xstart, mapY(arr->vals[0]));
-        for (int i = 1; i < arr->nvals; ++i)
-          path.lineTo(xstart + i * xstep, mapY(arr->vals[i]));
+        path.moveTo(xstart, mapY(arr->vals[start]));
+        for (int i = start + 1; i < end; ++i)
+          path.lineTo(xstart + (i - start) * xstep, mapY(arr->vals[i]));
         pmap.drawPath(path);
       }
       if (markers) {
         pmap.setPen(arr->color);
         pmap.setBrush(arr->color);
-        for (int i = 0; i < arr->nvals; ++i) {
-          int x = static_cast<int>(xstart + i * xstep);
+        for (int i = start; i < end; ++i) {
+          int x = static_cast<int>(xstart + (i - start) * xstep);
           int y = mapY(arr->vals[i]);
           pmap.drawRect(x - 1, y - 1, 3, 3);
         }
@@ -434,6 +462,48 @@ protected:
       infoBox->setAttribute(Qt::WA_DeleteOnClose);
       infoBox->setModal(false);
       infoBox->show();
+    } else if (event->button() == Qt::MiddleButton) {
+      if (zoomPlot && zoomAreaPtr && this != zoomPlot && !arrayPtrs.isEmpty()) {
+        int w = width();
+        int h = height();
+        int headerHeight = 0;
+        QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
+        if (!plotRect.contains(event->pos())) {
+          QWidget::mousePressEvent(event);
+          return;
+        }
+        int nvals = arrayPtrs[0]->nvals;
+        if (nvals < 1) {
+          QWidget::mousePressEvent(event);
+          return;
+        }
+        double xstep = nvals > 1 ? plotRect.width() /
+          static_cast<double>(nvals - 1) : 0.0;
+        int idx = static_cast<int>((event->pos().x() - plotRect.left()) /
+          xstep + 0.5);
+        int span = zoomAreaPtr->xEnd >= zoomAreaPtr->xStart ?
+          (zoomAreaPtr->xEnd - zoomAreaPtr->xStart + 1) : nvals / 10;
+        if (span < 1)
+          span = 1;
+        int half = span / 2;
+        int start = idx - half;
+        int end = start + span - 1;
+        if (start < 0) {
+          end -= start;
+          start = 0;
+        }
+        if (end >= nvals) {
+          start -= end - (nvals - 1);
+          end = nvals - 1;
+          if (start < 0)
+            start = 0;
+        }
+        zoomAreaPtr->xStart = start;
+        zoomAreaPtr->xEnd = end;
+        zoomPlot->update();
+      } else {
+        QWidget::mousePressEvent(event);
+      }
     } else {
       QWidget::mousePressEvent(event);
     }
@@ -587,6 +657,11 @@ public:
 
     updateStats();
     setMinimumWidth(800);
+  }
+
+  PlotWidget *plotWidget() const
+  {
+    return plot;
   }
 
   void refresh()
@@ -1395,10 +1470,17 @@ private:
       zoomArea.xmin = zoomArea.centerVal -
         scale[zoomArea.currScale] * GRIDDIVISIONS;
       zoomArea.initialized = true;
+      if (zarrs[0]->nvals > 0) {
+        int span = std::max(1, zarrs[0]->nvals / 10);
+        zoomArea.xStart = 0;
+        zoomArea.xEnd = span - 1;
+      }
       zoomWidget = new AreaWidget(&zoomArea, zarrs, central);
       layout->addWidget(zoomWidget);
       areaWidgets.append(zoomWidget);
       zoomWidget->setVisible(zoomOn);
+      zoomPlot = zoomWidget->plotWidget();
+      zoomAreaPtr = &zoomArea;
     }
     setCentralWidget(central);
 
