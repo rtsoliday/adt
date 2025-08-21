@@ -539,59 +539,62 @@ class AreaWidget : public QWidget
 {
 public:
   AreaWidget(AreaData *adata, const QVector<ArrayData *> &arrays,
-    QWidget *parent = nullptr)
+    QWidget *parent = nullptr, bool showTitleBox = true)
     : QWidget(parent), area(adata), arrayPtrs(arrays)
   {
     auto vbox = new QVBoxLayout(this);
     vbox->setContentsMargins(0, 0, 0, 0);
 
-    auto titleBox = new QVBoxLayout;
-    vbox->addLayout(titleBox);
+    QVBoxLayout *titleBox = nullptr;
     QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     QFontMetrics fm(fixedFont);
     int statWidth = fm.horizontalAdvance(" 000.000");
-    for (auto arr : arrayPtrs) {
-      auto row = new QHBoxLayout;
-      titleBox->addLayout(row);
-      auto colorLabel = new QLabel;
-      colorLabel->setFixedSize(12, 12);
-      colorLabel->setStyleSheet(QString("background-color:%1;")
-        .arg(arr->color.name()));
-      row->addWidget(colorLabel);
-      auto headLabel = new QLabel;
-      QString head = arr->heading;
-      if (!arr->units.isEmpty())
-        head += QString(" (%1)").arg(arr->units);
-      headLabel->setText(head);
-      headLabel->setFont(fixedFont);
-      row->addWidget(headLabel);
-      row->addStretch();
-      auto sdevText = new QLabel("SDEV:");
-      sdevText->setFont(fixedFont);
-      row->addWidget(sdevText);
-      auto sdevLabel = new QLabel;
-      sdevLabel->setFont(fixedFont);
-      sdevLabel->setAlignment(Qt::AlignRight);
-      sdevLabel->setFixedWidth(statWidth);
-      row->addWidget(sdevLabel);
-      auto avgText = new QLabel("   AVG:");
-      avgText->setFont(fixedFont);
-      row->addWidget(avgText);
-      auto avgLabel = new QLabel;
-      avgLabel->setFont(fixedFont);
-      avgLabel->setAlignment(Qt::AlignRight);
-      avgLabel->setFixedWidth(statWidth);
-      row->addWidget(avgLabel);
-      auto maxText = new QLabel("   MAX:");
-      maxText->setFont(fixedFont);
-      row->addWidget(maxText);
-      auto maxLabel = new QLabel;
-      maxLabel->setFont(fixedFont);
-      maxLabel->setAlignment(Qt::AlignRight);
-      maxLabel->setFixedWidth(statWidth);
-      row->addWidget(maxLabel);
-      StatLabels sl{ sdevLabel, avgLabel, maxLabel };
-      stats.append(sl);
+    if (showTitleBox) {
+      titleBox = new QVBoxLayout;
+      vbox->addLayout(titleBox);
+      for (auto arr : arrayPtrs) {
+        auto row = new QHBoxLayout;
+        titleBox->addLayout(row);
+        auto colorLabel = new QLabel;
+        colorLabel->setFixedSize(12, 12);
+        colorLabel->setStyleSheet(QString("background-color:%1;")
+          .arg(arr->color.name()));
+        row->addWidget(colorLabel);
+        auto headLabel = new QLabel;
+        QString head = arr->heading;
+        if (!arr->units.isEmpty())
+          head += QString(" (%1)").arg(arr->units);
+        headLabel->setText(head);
+        headLabel->setFont(fixedFont);
+        row->addWidget(headLabel);
+        row->addStretch();
+        auto sdevText = new QLabel("SDEV:");
+        sdevText->setFont(fixedFont);
+        row->addWidget(sdevText);
+        auto sdevLabel = new QLabel;
+        sdevLabel->setFont(fixedFont);
+        sdevLabel->setAlignment(Qt::AlignRight);
+        sdevLabel->setFixedWidth(statWidth);
+        row->addWidget(sdevLabel);
+        auto avgText = new QLabel("   AVG:");
+        avgText->setFont(fixedFont);
+        row->addWidget(avgText);
+        auto avgLabel = new QLabel;
+        avgLabel->setFont(fixedFont);
+        avgLabel->setAlignment(Qt::AlignRight);
+        avgLabel->setFixedWidth(statWidth);
+        row->addWidget(avgLabel);
+        auto maxText = new QLabel("   MAX:");
+        maxText->setFont(fixedFont);
+        row->addWidget(maxText);
+        auto maxLabel = new QLabel;
+        maxLabel->setFont(fixedFont);
+        maxLabel->setAlignment(Qt::AlignRight);
+        maxLabel->setFixedWidth(statWidth);
+        row->addWidget(maxLabel);
+        StatLabels sl{ sdevLabel, avgLabel, maxLabel };
+        stats.append(sl);
+      }
     }
 
     auto controls = new QHBoxLayout;
@@ -622,7 +625,9 @@ public:
     vbox->addWidget(plot, 1);
     int plotHeight = 148 + 1;
     plot->setMinimumHeight(plotHeight);
-    int topHeight = controls->sizeHint().height() + titleBox->sizeHint().height();
+    int topHeight = controls->sizeHint().height();
+    if (titleBox)
+      topHeight += titleBox->sizeHint().height();
     setMinimumHeight(plotHeight + topHeight + 15);
 
     connect(scaleSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
@@ -1475,7 +1480,7 @@ private:
         zoomArea.xStart = 0;
         zoomArea.xEnd = span - 1;
       }
-      zoomWidget = new AreaWidget(&zoomArea, zarrs, central);
+      zoomWidget = new AreaWidget(&zoomArea, zarrs, central, false);
       layout->addWidget(zoomWidget);
       areaWidgets.append(zoomWidget);
       zoomWidget->setVisible(zoomOn);
