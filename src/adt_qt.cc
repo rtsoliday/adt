@@ -84,6 +84,8 @@ static bool lines = true;
 static bool bars = false;
 static bool grid = true;
 static bool autoclear = true;
+static bool showmaxmin = true;
+static bool fillmaxmin = true;
 
 struct AreaData
 {
@@ -306,6 +308,43 @@ protected:
     pmap.setPen(Qt::black);
 
     int y0 = mapY(area->centerVal);
+
+    if (showmaxmin) {
+      for (auto arr : arrayPtrs) {
+        if (arr->nvals < 1 || arr->minVals.size() != arr->nvals ||
+            arr->maxVals.size() != arr->nvals)
+          continue;
+        double xstep = plotRect.width() /
+          static_cast<double>(arr->nvals);
+        double xstart = plotRect.left() + xstep / 2.0;
+        if (fillmaxmin) {
+          QPainterPath path;
+          path.moveTo(xstart, mapY(arr->minVals[0]));
+          for (int i = 1; i < arr->nvals; ++i)
+            path.lineTo(xstart + i * xstep, mapY(arr->minVals[i]));
+          for (int i = arr->nvals - 1; i >= 0; --i)
+            path.lineTo(xstart + i * xstep, mapY(arr->maxVals[i]));
+          path.closeSubpath();
+          pmap.fillPath(path, Qt::lightGray);
+        } else {
+          pmap.setPen(arr->color);
+          QPainterPath pathMin;
+          pathMin.moveTo(xstart, mapY(arr->minVals[0]));
+          for (int i = 1; i < arr->nvals; ++i)
+            pathMin.lineTo(xstart + i * xstep, mapY(arr->minVals[i]));
+          pmap.drawPath(pathMin);
+          QPainterPath pathMax;
+          pathMax.moveTo(xstart, mapY(arr->maxVals[0]));
+          for (int i = 1; i < arr->nvals; ++i)
+            pathMax.lineTo(xstart + i * xstep, mapY(arr->maxVals[i]));
+          pmap.drawPath(pathMax);
+          pmap.setPen(Qt::black);
+        }
+      }
+    }
+
+    pmap.setPen(Qt::black);
+    pmap.drawLine(plotRect.left(), y0, plotRect.right(), y0);
 
     if (area->tempnodraw) {
       area->tempnodraw = false;
@@ -745,8 +784,22 @@ public:
     });
     QAction *maxminAct = viewMenu->addAction("Max/Min");
     maxminAct->setCheckable(true);
+    maxminAct->setChecked(showmaxmin);
+    connect(maxminAct, &QAction::toggled, this, [this](bool checked)
+    {
+      showmaxmin = checked;
+      for (auto aw : areaWidgets)
+        aw->refresh();
+    });
     QAction *fillAct = viewMenu->addAction("Filled Max/Min");
     fillAct->setCheckable(true);
+    fillAct->setChecked(fillmaxmin);
+    connect(fillAct, &QAction::toggled, this, [this](bool checked)
+    {
+      fillmaxmin = checked;
+      for (auto aw : areaWidgets)
+        aw->refresh();
+    });
 
     QMenu *clearMenu = menuBar()->addMenu("Clear");
     QAction *clearAct = clearMenu->addAction("Clear");
