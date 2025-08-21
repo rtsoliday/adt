@@ -286,10 +286,11 @@ protected:
     double ymax = area->centerVal + upd * GRIDDIVISIONS;
 
     auto mapY = [&](double v) {
-      if (v > ymax)
-        v = ymax;
-      if (v < ymin)
-        v = ymin;
+      // Allow values to map outside of the visible plotting area so that
+      // data points and connecting lines can extend beyond the edges when
+      // necessary. This avoids clamping out-of-range values to the plot
+      // boundaries, which previously caused points to appear on the edge of
+      // the graph.
       double frac = (v - ymin) / (ymax - ymin);
       return plotRect.bottom() - static_cast<int>(frac * plotRect.height());
     };
