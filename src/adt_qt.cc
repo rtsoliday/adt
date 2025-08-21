@@ -31,6 +31,7 @@
 #include <QMouseEvent>
 #include <QDoubleSpinBox>
 #include <QString>
+#include <QStringList>
 #include <QLineEdit>
 #include <QWidget>
 #include <QList>
@@ -587,7 +588,9 @@ private:
 class MainWindow : public QMainWindow
 {
 public:
-  explicit MainWindow(QWidget *parent = nullptr) : QMainWindow(parent)
+  explicit MainWindow(const QString &homeOverride, bool homeSpecified,
+    const QString &startupPv, QWidget *parent = nullptr)
+    : QMainWindow(parent)
   {
     auto logo = new LogoWidget(this);
     setCentralWidget(logo);
@@ -595,10 +598,16 @@ public:
     connect(pollTimer, &QTimer::timeout, this, [this]() { pollPvUpdate(); });
 
     QMenu *fileMenu = menuBar()->addMenu("File");
-    QString adtHome = qEnvironmentVariable("ADTHOME", ".");
-    QString initFile = QDir::home().filePath("." INITFILENAME);
-    if (!QFile::exists(initFile))
+    QString adtHome = homeOverride.isEmpty() ?
+      qEnvironmentVariable("ADTHOME", ".") : homeOverride;
+    QString initFile;
+    if (homeSpecified) {
       initFile = QDir(adtHome).filePath(INITFILENAME);
+    } else {
+      initFile = QDir::home().filePath("." INITFILENAME);
+      if (!QFile::exists(initFile))
+        initFile = QDir(adtHome).filePath(INITFILENAME);
+    }
     QString pvDir;
     QList<LoadMenuInfo> menus = readInitFile(initFile, adtHome, pvDir,
       customDirectory);
@@ -622,6 +631,12 @@ public:
         loadPvFile(fn);
       }
     });
+    if (!startupPv.isEmpty()) {
+      QString file = startupPv;
+      if (QFileInfo(file).isRelative())
+        file = QDir(pvDir).filePath(file);
+      loadPvFile(file);
+    }
     fileMenu->addAction("Read Reference");
     QMenu *readSnapMenu = fileMenu->addMenu("Read Snapshot");
     for (int i = 1; i <= NSAVE; ++i)
@@ -1299,7 +1314,20 @@ private:
 int main(int argc, char **argv)
 {
   QApplication app(argc, argv);
-  MainWindow win;
+  QString startPv;
+  QString homeOverride;
+  bool homeSpecified = false;
+  QStringList args = app.arguments();
+  for (int i = 1; i < args.size(); ++i) {
+    const QString &arg = args.at(i);
+    if ((arg == "-a" || arg == "/a") && i + 1 < args.size()) {
+      homeOverride = args.at(++i);
+      homeSpecified = true;
+    } else if ((arg == "-f" || arg == "/f") && i + 1 < args.size()) {
+      startPv = args.at(++i);
+    }
+  }
+  MainWindow win(homeOverride, homeSpecified, startPv);
   win.show();
   return app.exec();
 }
