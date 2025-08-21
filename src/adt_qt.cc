@@ -315,29 +315,29 @@ protected:
     for (auto arr : arrayPtrs) {
       if (arr->nvals < 1)
         continue;
-      double xstep = arr->nvals > 1 ? plotRect.width() /
-        static_cast<double>(arr->nvals - 1) : 0.0;
+      double xstep = plotRect.width() /
+        static_cast<double>(arr->nvals);
+      double xstart = plotRect.left() + xstep / 2.0; // add half-bin margin
       if (bars) {
         pmap.setPen(arr->color);
         for (int i = 0; i < arr->nvals; ++i) {
-          int x = plotRect.left() + static_cast<int>(i * xstep);
+          int x = static_cast<int>(xstart + i * xstep);
           int y = mapY(arr->vals[i]);
           pmap.drawLine(x, y0, x, y);
         }
       } else if (lines) {
         pmap.setPen(arr->color);
         QPainterPath path;
-        path.moveTo(plotRect.left(), mapY(arr->vals[0]));
+        path.moveTo(xstart, mapY(arr->vals[0]));
         for (int i = 1; i < arr->nvals; ++i)
-          path.lineTo(plotRect.left() + static_cast<int>(i * xstep),
-            mapY(arr->vals[i]));
+          path.lineTo(xstart + i * xstep, mapY(arr->vals[i]));
         pmap.drawPath(path);
       }
       if (markers) {
         pmap.setPen(arr->color);
         pmap.setBrush(arr->color);
         for (int i = 0; i < arr->nvals; ++i) {
-          int x = plotRect.left() + static_cast<int>(i * xstep);
+          int x = static_cast<int>(xstart + i * xstep);
           int y = mapY(arr->vals[i]);
           pmap.drawRect(x - 1, y - 1, 3, 3);
         }
