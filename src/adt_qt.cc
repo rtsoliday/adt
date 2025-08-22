@@ -1234,7 +1234,22 @@ public:
     });
     QAction *statAct = optionsMenu->addAction("Accumulated Statistics");
     statAct->setCheckable(true);
-    optionsMenu->addAction("Reset Max/Min");
+    QAction *resetAct = optionsMenu->addAction("Reset Max/Min");
+    connect(resetAct, &QAction::triggered, this, [this]()
+    {
+      nstat = 0.0;
+      nstatTime = 0.0;
+      for (ArrayData &arr : arrays) {
+        arr.minVals.fill(LARGEVAL);
+        arr.maxVals.fill(-LARGEVAL);
+        arr.runSdev = 0.0;
+        arr.runAvg = 0.0;
+        arr.runMax = 0.0;
+      }
+      for (AreaData &area : areas)
+        area.tempclear = true;
+      resetGraph();
+    });
 
     QMenu *viewMenu = menuBar()->addMenu("View");
     QAction *timingAct = viewMenu->addAction("Timing...");
