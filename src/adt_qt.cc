@@ -81,27 +81,14 @@ static const char *defaultColors[] = {
 static constexpr int NCOLORS = sizeof(defaultColors) / sizeof(defaultColors[0]);
 static constexpr int NSAVE = 5;
 
-static bool markers = true;
-static bool lines = true;
-static bool bars = false;
-static bool grid = true;
-static bool autoclear = true;
-static bool showmaxmin = true;
-static bool fillmaxmin = true;
-static int diffSet = -1;
-static int displaySet = -1;
+static bool markers = true, lines = true, bars = false, grid = true,
+  autoclear = true, showmaxmin = true, fillmaxmin = true, statMode = false,
+  refOn = true, referenceLoaded = false;
+static int diffSet = -1, displaySet = -1, nsect = 0;
 static QColor displayColor("Grey40");
-static bool statMode = false;
-static bool refOn = true;
-static bool referenceLoaded = false;
-static double nstat = 0.0;
-static double nstatTime = 0.0;
-
-static int nsect = 0;
-static double stotal = 0.0;
+static double nstat = 0.0, nstatTime = 0.0, stotal = 0.0;
 static QVector<QString> latNames;
-static QVector<double> latS;
-static QVector<double> latLen;
+static QVector<double> latS, latLen;
 static QVector<short> latHeight;
 
 struct AreaData
@@ -237,16 +224,8 @@ static QList<LoadMenuInfo> readInitFile(const QString &filename,
       QString lab = labels ? labels[i] : files[i];
       menu.items.append({lab, fname});
     }
-    if (files) {
-      for (int i = 0; i < rows; ++i)
-        SDDS_Free(files[i]);
-      SDDS_Free(files);
-    }
-    if (labels) {
-      for (int i = 0; i < rows; ++i)
-        SDDS_Free(labels[i]);
-      SDDS_Free(labels);
-    }
+    freeSddsStrings(rows, files);
+    freeSddsStrings(rows, labels);
     menus.append(menu);
   }
   SDDS_Terminate(&table);
@@ -264,10 +243,7 @@ static QList<LoadMenuInfo> readInitFile(const QString &filename,
 static bool readLatticeFile(const QString &filename, int &nsectOut,
   double &stotalOut)
 {
-  latNames.clear();
-  latS.clear();
-  latLen.clear();
-  latHeight.clear();
+  latNames.clear(); latS.clear(); latLen.clear(); latHeight.clear();
   SDDS_TABLE table;
   QByteArray fname = filename.toUtf8();
   if (!SDDS_InitializeInput(&table, fname.data()))
@@ -299,22 +275,16 @@ static bool readLatticeFile(const QString &filename, int &nsectOut,
           latS.append(scol[i]);
           latLen.append(len[i]);
           latHeight.append(height[i]);
-          SDDS_Free(names[i]);
         }
         ok = true;
       }
-      if (names)
-        SDDS_Free(names);
-      if (scol)
-        SDDS_Free(scol);
-      if (len)
-        SDDS_Free(len);
-      if (height)
-        SDDS_Free(height);
+      freeSddsStrings(rows, names);
+      SDDS_Free(scol);
+      SDDS_Free(len);
+      SDDS_Free(height);
     }
   }
-  if (type)
-    SDDS_Free(type);
+  SDDS_Free(type);
   SDDS_Terminate(&table);
   return ok;
 }
@@ -1811,13 +1781,11 @@ private:
           QMessageBox::warning(this, "ADT",
             QString("Not a valid ADT Reference/Snapshot file: %1")
               .arg(filename));
-          if (type)
-            SDDS_Free(type);
+          SDDS_Free(type);
           SDDS_Terminate(&table);
           return false;
         }
-        if (type)
-          SDDS_Free(type);
+        SDDS_Free(type);
       }
       int nvals = SDDS_CountRowsOfInterest(&table);
       if (nvals != arrays[ia].nvals) {
@@ -1904,13 +1872,11 @@ private:
           QMessageBox::warning(this, "ADT",
             QString("Not a valid ADT Reference/Snapshot file: %1")
               .arg(filename));
-          if (type)
-            SDDS_Free(type);
+          SDDS_Free(type);
           SDDS_Terminate(&table);
           return false;
         }
-        if (type)
-          SDDS_Free(type);
+        SDDS_Free(type);
         char *time = nullptr;
         if (SDDS_GetParameter(&table, const_cast<char *>("TimeStamp"), &time)) {
           saveTime[nsave] = QString::fromUtf8(time);
@@ -2232,8 +2198,7 @@ private:
         if (!SDDS_GetParameter(&table, const_cast<char *>("ADTFileType"), &type) ||
             strcmp(type, PVID)) {
           QMessageBox::warning(this, "ADT", "Not a valid ADT PV file");
-          if (type)
-            SDDS_Free(type);
+          SDDS_Free(type);
           SDDS_Terminate(&table);
           ca_context_destroy();
           caStarted = false;
