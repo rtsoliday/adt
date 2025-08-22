@@ -30,6 +30,7 @@
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QDoubleSpinBox>
+#include <QSpinBox>
 #include <QString>
 #include <QStringList>
 #include <QLineEdit>
@@ -814,7 +815,8 @@ class AreaWidget : public QWidget
 {
 public:
   AreaWidget(AreaData *adata, const QVector<ArrayData *> &arrays,
-    QWidget *parent = nullptr, bool showTitleBox = true)
+    QWidget *parent = nullptr, bool showTitleBox = true,
+    bool isZoomPlot = false)
     : QWidget(parent), area(adata), arrayPtrs(arrays)
   {
     auto vbox = new QVBoxLayout(this);
@@ -894,6 +896,18 @@ public:
     centerSpin->setRange(-LARGEVAL, LARGEVAL);
     centerSpin->setValue(area->centerVal);
     controls->addWidget(centerSpin);
+    if (isZoomPlot) {
+      auto intervalLabel = new QLabel("Interval:");
+      controls->addWidget(intervalLabel);
+      intervalSpin = new QSpinBox;
+      int max = nsect > 0 ? nsect : 1;
+      intervalSpin->setRange(1, max);
+      int def = std::min(3, max);
+      intervalSpin->setValue(def);
+      controls->addWidget(intervalSpin);
+    } else {
+      intervalSpin = nullptr;
+    }
     controls->addStretch();
 
     plot = new PlotWidget(adata, arrays, this);
@@ -934,6 +948,34 @@ public:
       area->xmin = area->centerVal - scale[area->currScale] * GRIDDIVISIONS;
       plot->update();
     });
+
+    if (intervalSpin) {
+      connect(intervalSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+        this, [this](int val)
+      {
+        if (arrayPtrs.isEmpty())
+          return;
+        int nvals = arrayPtrs[0]->nvals;
+        if (nvals < 1)
+          return;
+        int perSect = nsect > 0 ? std::max(1, nvals / nsect) : nvals;
+        int span = perSect * val;
+        if (span > nvals)
+          span = nvals;
+        int oldSpan = (area->xEnd >= area->xStart) ?
+          (area->xEnd - area->xStart + 1) :
+          (nvals - area->xStart + area->xEnd + 1);
+        int center = (area->xStart + oldSpan / 2) % nvals;
+        int start = center - span / 2;
+        start %= nvals;
+        if (start < 0)
+          start += nvals;
+        int end = (start + span - 1) % nvals;
+        area->xStart = start;
+        area->xEnd = end;
+        plot->update();
+      });
+    }
 
     updateStats();
     setMinimumWidth(800);
@@ -977,6 +1019,7 @@ private:
   PlotWidget *plot;
   QDoubleSpinBox *scaleSpin;
   QDoubleSpinBox *centerSpin;
+  QSpinBox *intervalSpin;
   QVector<StatLabels> stats;
 };
 
@@ -1792,11 +1835,15 @@ private:
         scale[zoomArea.currScale] * GRIDDIVISIONS;
       zoomArea.initialized = true;
       if (zarrs[0]->nvals > 0) {
-        int span = std::max(1, zarrs[0]->nvals / 10);
+        int maxSect = nsect > 0 ? nsect : 1;
+        int interval = std::min(3, maxSect);
+        int span = std::max(1,
+          (nsect > 0) ? (zarrs[0]->nvals * interval) / nsect :
+          zarrs[0]->nvals / 10);
         zoomArea.xStart = 0;
         zoomArea.xEnd = span - 1;
       }
-      zoomWidget = new AreaWidget(&zoomArea, zarrs, central, false);
+      zoomWidget = new AreaWidget(&zoomArea, zarrs, central, false, true);
       layout->addWidget(zoomWidget);
       areaWidgets.append(zoomWidget);
       zoomWidget->setVisible(zoomOn);
