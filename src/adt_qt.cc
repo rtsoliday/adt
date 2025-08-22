@@ -915,6 +915,7 @@ public:
       centerSectSpin = new QSpinBox;
       centerSectSpin->setRange(1, max);
       centerSectSpin->setValue(1);
+      centerSectSpin->setWrapping(true);
       controls->addWidget(centerSectSpin);
     } else {
       intervalSpin = nullptr;
@@ -1316,11 +1317,6 @@ public:
     });
 
     QMenu *helpMenu = menuBar()->addMenu("Help");
-    helpMenu->addAction("Contents");
-    helpMenu->addAction("New Features");
-    helpMenu->addAction("Overview");
-    helpMenu->addAction("Mouse Operations");
-    helpMenu->addAction("Color Code");
     QAction *versionAct = helpMenu->addAction("Version");
     connect(versionAct, &QAction::triggered, this, [this]()
     {
@@ -1854,7 +1850,7 @@ private:
 
     if (ca_pend_io(1.0) == ECA_TIMEOUT) {
       QMessageBox *timeoutBox = new QMessageBox(QMessageBox::Warning, "ADT",
-        "Timeout connecting to PVs. ADT may be sluggish.", QMessageBox::NoButton, this);
+        "Timeout connecting to PVs.", QMessageBox::NoButton, this);
       timeoutBox->setAttribute(Qt::WA_DeleteOnClose);
       timeoutBox->show();
       QTimer::singleShot(5000, timeoutBox, &QMessageBox::accept);
