@@ -1230,11 +1230,6 @@ public:
     connect(quitAct, &QAction::triggered, this, &QWidget::close);
 
     QMenu *optionsMenu = menuBar()->addMenu("Options");
-    QMenu *epicsMenu = optionsMenu->addMenu("EPICS");
-    epicsMenu->addAction("Start");
-    epicsMenu->addAction("Reinitialize");
-    epicsMenu->addAction("Rescan");
-    epicsMenu->addAction("Exit");
     QMenu *storeMenu = optionsMenu->addMenu("Store");
     for (int i = 1; i <= NSAVE; ++i)
       storeMenu->addAction(QString::number(i));
@@ -1246,10 +1241,6 @@ public:
     diffMenu->addAction("Off");
     for (int i = 1; i <= NSAVE; ++i)
       diffMenu->addAction(QString::number(i));
-    QMenu *checkMenu = optionsMenu->addMenu("Check Status");
-    checkMenu->addAction("Off");
-    checkMenu->addAction("Check InValid");
-    checkMenu->addAction("Check All");
     refAct = optionsMenu->addAction("Reference Enabled");
     refAct->setCheckable(true);
     refAct->setChecked(refOn);
