@@ -90,6 +90,9 @@ static bool autoclear = true;
 static bool showmaxmin = true;
 static bool fillmaxmin = true;
 static int diffSet = -1;
+static bool statMode = false;
+static double nstat = 0.0;
+static double nstatTime = 0.0;
 
 static int nsect = 0;
 static double stotal = 0.0;
@@ -1095,12 +1098,17 @@ private:
     for (int i = 0; i < arrayPtrs.size() && i < stats.size(); ++i) {
       auto arr = arrayPtrs[i];
       auto sl = stats[i];
+      double sdevVal = (statMode && nstat > 0)
+        ? arr->runSdev / nstat : arr->sdev;
+      double avgVal = (statMode && nstat > 0)
+        ? arr->runAvg / nstat : arr->avg;
+      double maxVal = statMode ? arr->runMax : arr->maxVal;
       sl.sdev->setText(QString("%1").arg(
-        arr->sdev * arr->scaleFactor, 0, 'f', 3));
+        sdevVal * arr->scaleFactor, 0, 'f', 3));
       sl.avg->setText(QString("%1").arg(
-        arr->avg * arr->scaleFactor, 0, 'f', 3));
+        avgVal * arr->scaleFactor, 0, 'f', 3));
       sl.max->setText(QString("%1").arg(
-        arr->maxVal * arr->scaleFactor, 0, 'f', 3));
+        maxVal * arr->scaleFactor, 0, 'f', 3));
     }
   }
 
@@ -1234,6 +1242,23 @@ public:
     });
     QAction *statAct = optionsMenu->addAction("Accumulated Statistics");
     statAct->setCheckable(true);
+    statAct->setChecked(statMode);
+    connect(statAct, &QAction::toggled, this, [this](bool checked)
+    {
+      statMode = checked;
+      nstat = 0.0;
+      nstatTime = 0.0;
+      for (ArrayData &arr : arrays) {
+        arr.runSdev = 0.0;
+        arr.runAvg = 0.0;
+        arr.runMax = 0.0;
+      }
+      for (AreaData &area : areas)
+        area.tempclear = true;
+      if (zoomWidget)
+        zoomArea.tempclear = true;
+      resetGraph();
+    });
     QAction *resetAct = optionsMenu->addAction("Reset Max/Min");
     connect(resetAct, &QAction::triggered, this, [this]()
     {
@@ -1448,8 +1473,6 @@ private:
   QTimer *pollTimer = nullptr;
   int timeInterval = 2000;
   bool caStarted = false;
-  double nstat = 0.0;
-  double nstatTime = 0.0;
   int nsymbols = 0;
 
   void resetGraph()
