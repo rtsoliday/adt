@@ -137,9 +137,12 @@ struct ArrayData
 };
 
 class PlotWidget;
+class AreaWidget;
 
 static PlotWidget *zoomPlot = nullptr;
 static AreaData *zoomAreaPtr = nullptr;
+static AreaWidget *zoomAreaWidget = nullptr;
+static void updateZoomCenter();
 
 struct LoadItem
 {
@@ -777,6 +780,7 @@ protected:
         zoomAreaPtr->xStart = start;
         zoomAreaPtr->xEnd = end;
         zoomPlot->update();
+        updateZoomCenter();
       } else {
         QWidget::mousePressEvent(event);
       }
@@ -906,8 +910,15 @@ public:
       int def = std::min(3, max);
       intervalSpin->setValue(def);
       controls->addWidget(intervalSpin);
+      auto centerSectLabel = new QLabel("Center Sector:");
+      controls->addWidget(centerSectLabel);
+      centerSectSpin = new QSpinBox;
+      centerSectSpin->setRange(1, max);
+      centerSectSpin->setValue(1);
+      controls->addWidget(centerSectSpin);
     } else {
       intervalSpin = nullptr;
+      centerSectSpin = nullptr;
     }
     controls->addStretch();
 
@@ -976,7 +987,44 @@ public:
         area->xStart = start;
         area->xEnd = end;
         plot->update();
+        updateCenterSectSpin();
       });
+      connect(centerSectSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+        this, [this](int val)
+      {
+        if (arrayPtrs.isEmpty() || nsect <= 0 || stotal <= 0.0)
+          return;
+        int nvals = arrayPtrs[0]->nvals;
+        if (nvals < 1)
+          return;
+        double sectLen = stotal / nsect;
+        double target = (val - 0.5) * sectLen;
+        int center = 0;
+        double best = std::numeric_limits<double>::max();
+        for (int i = 0; i < nvals; ++i) {
+          double s = std::fmod(arrayPtrs[0]->s[i], stotal);
+          if (s < 0)
+            s += stotal;
+          double diff = std::fabs(s - target);
+          if (diff < best) {
+            best = diff;
+            center = i;
+          }
+        }
+        int span = (area->xEnd >= area->xStart) ?
+          (area->xEnd - area->xStart + 1) :
+          (nvals - area->xStart + area->xEnd + 1);
+        int start = center - span / 2;
+        start %= nvals;
+        if (start < 0)
+          start += nvals;
+        int end = (start + span - 1) % nvals;
+        area->xStart = start;
+        area->xEnd = end;
+        plot->update();
+        updateCenterSectSpin();
+      });
+      updateCenterSectSpin();
     }
 
     updateStats();
@@ -991,7 +1039,28 @@ public:
   void refresh()
   {
     updateStats();
+    updateCenterSectSpin();
     plot->update();
+  }
+
+  void updateCenterSectSpin()
+  {
+    if (!centerSectSpin || arrayPtrs.isEmpty() || nsect <= 0 || stotal <= 0.0)
+      return;
+    int nvals = arrayPtrs[0]->nvals;
+    if (nvals < 1)
+      return;
+    int span = (area->xEnd >= area->xStart) ?
+      (area->xEnd - area->xStart + 1) :
+      (nvals - area->xStart + area->xEnd + 1);
+    int center = (area->xStart + span / 2) % nvals;
+    double s = std::fmod(arrayPtrs[0]->s[center], stotal);
+    if (s < 0)
+      s += stotal;
+    int sect = static_cast<int>((s * nsect) / stotal) + 1;
+    centerSectSpin->blockSignals(true);
+    centerSectSpin->setValue(sect);
+    centerSectSpin->blockSignals(false);
   }
 
 private:
@@ -1022,8 +1091,15 @@ private:
   QDoubleSpinBox *scaleSpin;
   QDoubleSpinBox *centerSpin;
   QSpinBox *intervalSpin;
+  QSpinBox *centerSectSpin;
   QVector<StatLabels> stats;
 };
+
+static void updateZoomCenter()
+{
+  if (zoomAreaWidget)
+    zoomAreaWidget->updateCenterSectSpin();
+}
 
 class MainWindow : public QMainWindow
 {
@@ -1272,6 +1348,7 @@ public:
       ca_context_destroy();
     if (pollTimer)
       pollTimer->stop();
+    zoomAreaWidget = nullptr;
   }
 
 private:
@@ -1556,6 +1633,7 @@ private:
     areas.clear();
     areaWidgets.clear();
     zoomWidget = nullptr;
+    zoomAreaWidget = nullptr;
     nstat = 0.0;
     nstatTime = 0.0;
     for (int i = 0; i < NSAVE; ++i) {
@@ -1870,6 +1948,7 @@ private:
       zoomWidget->setVisible(zoomOn);
       zoomPlot = zoomWidget->plotWidget();
       zoomAreaPtr = &zoomArea;
+      zoomAreaWidget = zoomWidget;
     }
     setCentralWidget(central);
 
