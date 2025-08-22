@@ -1309,8 +1309,15 @@ private:
       return;
     ca_poll();
     for (ArrayData &arr : arrays) {
-      for (int i = 0; i < arr.nvals; ++i)
-        ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
+      for (int i = 0; i < arr.nvals; ++i) {
+        if (arr.chids[i] && ca_state(arr.chids[i]) == cs_conn) {
+          ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
+          arr.conn[i] = true;
+        } else {
+          arr.vals[i] = 0.0;
+          arr.conn[i] = false;
+        }
+      }
     }
     ca_pend_io(1.0);
     for (ArrayData &arr : arrays) {
@@ -1776,8 +1783,15 @@ private:
     }
 
     for (ArrayData &arr : arrays) {
-      for (int i = 0; i < arr.nvals; ++i)
-        ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
+      for (int i = 0; i < arr.nvals; ++i) {
+        if (arr.chids[i] && ca_state(arr.chids[i]) == cs_conn) {
+          ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
+          arr.conn[i] = true;
+        } else {
+          arr.vals[i] = 0.0;
+          arr.conn[i] = false;
+        }
+      }
     }
     ca_pend_io(1.0);
 
