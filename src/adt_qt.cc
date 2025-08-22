@@ -1767,8 +1767,13 @@ private:
 
     SDDS_Terminate(&table);
 
-    if (ca_pend_io(1.0) == ECA_TIMEOUT)
-      QMessageBox::warning(this, "ADT", "Timeout connecting to PVs. ADT may be sluggish.");
+    if (ca_pend_io(1.0) == ECA_TIMEOUT) {
+      QMessageBox *timeoutBox = new QMessageBox(QMessageBox::Warning, "ADT",
+        "Timeout connecting to PVs. ADT may be sluggish.", QMessageBox::NoButton, this);
+      timeoutBox->setAttribute(Qt::WA_DeleteOnClose);
+      timeoutBox->show();
+      QTimer::singleShot(5000, timeoutBox, &QMessageBox::accept);
+    }
 
     for (ArrayData &arr : arrays) {
       for (int i = 0; i < arr.nvals; ++i)
