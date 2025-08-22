@@ -481,22 +481,19 @@ protected:
             pmap.fillPath(path, Qt::lightGray);
           } else {
             pmap.setPen(arr->color);
-            QVector<QPointF> ptsMin;
-            ptsMin.reserve(count);
+            tmpPts.resize(count);
             for (int i = 0; i < count; ++i) {
               int idx = (start + i) % nvals;
-              ptsMin.append(QPointF(xpos(idx),
-                mapY(diffVal(arr, arr->minVals, idx))));
+              tmpPts[i] = QPointF(xpos(idx),
+                mapY(diffVal(arr, arr->minVals, idx)));
             }
-            pmap.drawPolyline(ptsMin.constData(), ptsMin.size());
-            QVector<QPointF> ptsMax;
-            ptsMax.reserve(count);
+            pmap.drawPolyline(tmpPts.constData(), count);
             for (int i = 0; i < count; ++i) {
               int idx = (start + i) % nvals;
-              ptsMax.append(QPointF(xpos(idx),
-                mapY(diffVal(arr, arr->maxVals, idx))));
+              tmpPts[i] = QPointF(xpos(idx),
+                mapY(diffVal(arr, arr->maxVals, idx)));
             }
-            pmap.drawPolyline(ptsMax.constData(), ptsMax.size());
+            pmap.drawPolyline(tmpPts.constData(), count);
             pmap.setPen(Qt::black);
           }
         } else {
@@ -525,18 +522,15 @@ protected:
             pmap.fillPath(path, Qt::lightGray);
           } else {
             pmap.setPen(arr->color);
-            QVector<QPointF> ptsMin;
-            ptsMin.reserve(count);
+            tmpPts.resize(count);
             for (int i = start; i < end; ++i)
-              ptsMin.append(QPointF(xstart + (i - start) * xstep,
-                mapY(diffVal(arr, arr->minVals, i))));
-            pmap.drawPolyline(ptsMin.constData(), ptsMin.size());
-            QVector<QPointF> ptsMax;
-            ptsMax.reserve(count);
+              tmpPts[i - start] = QPointF(xstart + (i - start) * xstep,
+                mapY(diffVal(arr, arr->minVals, i)));
+            pmap.drawPolyline(tmpPts.constData(), count);
             for (int i = start; i < end; ++i)
-              ptsMax.append(QPointF(xstart + (i - start) * xstep,
-                mapY(diffVal(arr, arr->maxVals, i))));
-            pmap.drawPolyline(ptsMax.constData(), ptsMax.size());
+              tmpPts[i - start] = QPointF(xstart + (i - start) * xstep,
+                mapY(diffVal(arr, arr->maxVals, i)));
+            pmap.drawPolyline(tmpPts.constData(), count);
             pmap.setPen(Qt::black);
           }
         }
@@ -574,9 +568,8 @@ protected:
           double smax = arr->s[end] + (end < start ? stotal : 0.0);
           double range = smax - smin;
           double xscale = plotRect.width() / range;
-          QVector<QPointF> pts;
           if (lines)
-            pts.reserve(count);
+            tmpPts.resize(count);
           if (markers)
             pmap.setBrush(clr);
           for (int i = 0; i < count; ++i) {
@@ -590,12 +583,12 @@ protected:
             if (bars)
               pmap.drawLine(xi, y0, xi, y);
             if (lines)
-              pts.append(QPointF(x, y));
+              tmpPts[i] = QPointF(x, y);
             if (markers)
               pmap.drawRect(xi - 1, y - 1, 3, 3);
           }
           if (lines)
-            pmap.drawPolyline(pts.constData(), pts.size());
+            pmap.drawPolyline(tmpPts.constData(), count);
           if (markers)
             pmap.setBrush(Qt::NoBrush);
         } else {
@@ -611,9 +604,8 @@ protected:
           double xstep = plotRect.width() /
             static_cast<double>(count);
           double x = plotRect.left() + xstep / 2.0;
-          QVector<QPointF> pts;
           if (lines)
-            pts.reserve(count);
+            tmpPts.resize(count);
           if (markers)
             pmap.setBrush(clr);
           for (int i = start; i < end; ++i, x += xstep) {
@@ -622,12 +614,12 @@ protected:
             if (bars)
               pmap.drawLine(xi, y0, xi, y);
             if (lines)
-              pts.append(QPointF(x, y));
+              tmpPts[i - start] = QPointF(x, y);
             if (markers)
               pmap.drawRect(xi - 1, y - 1, 3, 3);
           }
           if (lines)
-            pmap.drawPolyline(pts.constData(), pts.size());
+            pmap.drawPolyline(tmpPts.constData(), count);
           if (markers)
             pmap.setBrush(Qt::NoBrush);
         }
@@ -849,6 +841,7 @@ private:
   QVector<ArrayData *> arrayPtrs;
   QPointer<QMessageBox> infoBox;
   QPixmap pixmap;
+  QVector<QPointF> tmpPts;
 };
 
 /**
