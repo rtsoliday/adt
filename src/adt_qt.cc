@@ -37,6 +37,7 @@
 #include <QWidget>
 #include <QList>
 #include <QVector>
+#include <QPointF>
 #include <QColor>
 #include <QTimer>
 #include <QInputDialog>
@@ -477,22 +478,22 @@ protected:
             pmap.fillPath(path, Qt::lightGray);
           } else {
             pmap.setPen(arr->color);
-            QPainterPath pathMin;
-            pathMin.moveTo(xpos(start), mapY(diffVal(arr, arr->minVals, start)));
-            for (int i = 1; i < count; ++i) {
+            QVector<QPointF> ptsMin;
+            ptsMin.reserve(count);
+            for (int i = 0; i < count; ++i) {
               int idx = (start + i) % nvals;
-              pathMin.lineTo(xpos(idx),
-                mapY(diffVal(arr, arr->minVals, idx)));
+              ptsMin.append(QPointF(xpos(idx),
+                mapY(diffVal(arr, arr->minVals, idx))));
             }
-            pmap.drawPath(pathMin);
-            QPainterPath pathMax;
-            pathMax.moveTo(xpos(start), mapY(diffVal(arr, arr->maxVals, start)));
-            for (int i = 1; i < count; ++i) {
+            pmap.drawPolyline(ptsMin.constData(), ptsMin.size());
+            QVector<QPointF> ptsMax;
+            ptsMax.reserve(count);
+            for (int i = 0; i < count; ++i) {
               int idx = (start + i) % nvals;
-              pathMax.lineTo(xpos(idx),
-                mapY(diffVal(arr, arr->maxVals, idx)));
+              ptsMax.append(QPointF(xpos(idx),
+                mapY(diffVal(arr, arr->maxVals, idx))));
             }
-            pmap.drawPath(pathMax);
+            pmap.drawPolyline(ptsMax.constData(), ptsMax.size());
             pmap.setPen(Qt::black);
           }
         } else {
@@ -521,18 +522,18 @@ protected:
             pmap.fillPath(path, Qt::lightGray);
           } else {
             pmap.setPen(arr->color);
-            QPainterPath pathMin;
-            pathMin.moveTo(xstart, mapY(diffVal(arr, arr->minVals, start)));
-            for (int i = start + 1; i < end; ++i)
-              pathMin.lineTo(xstart + (i - start) * xstep,
-                mapY(diffVal(arr, arr->minVals, i)));
-            pmap.drawPath(pathMin);
-            QPainterPath pathMax;
-            pathMax.moveTo(xstart, mapY(diffVal(arr, arr->maxVals, start)));
-            for (int i = start + 1; i < end; ++i)
-              pathMax.lineTo(xstart + (i - start) * xstep,
-                mapY(diffVal(arr, arr->maxVals, i)));
-            pmap.drawPath(pathMax);
+            QVector<QPointF> ptsMin;
+            ptsMin.reserve(count);
+            for (int i = start; i < end; ++i)
+              ptsMin.append(QPointF(xstart + (i - start) * xstep,
+                mapY(diffVal(arr, arr->minVals, i))));
+            pmap.drawPolyline(ptsMin.constData(), ptsMin.size());
+            QVector<QPointF> ptsMax;
+            ptsMax.reserve(count);
+            for (int i = start; i < end; ++i)
+              ptsMax.append(QPointF(xstart + (i - start) * xstep,
+                mapY(diffVal(arr, arr->maxVals, i))));
+            pmap.drawPolyline(ptsMax.constData(), ptsMax.size());
             pmap.setPen(Qt::black);
           }
         }
@@ -585,13 +586,14 @@ protected:
             }
           } else if (lines) {
             pmap.setPen(clr);
-            QPainterPath path;
-            path.moveTo(xpos(start), mapY(diffVal(arr, vec, start)));
-            for (int i = 1; i < count; ++i) {
+            QVector<QPointF> pts;
+            pts.reserve(count);
+            for (int i = 0; i < count; ++i) {
               int idx = (start + i) % nvals;
-              path.lineTo(xpos(idx), mapY(diffVal(arr, vec, idx)));
+              pts.append(QPointF(xpos(idx),
+                mapY(diffVal(arr, vec, idx))));
             }
-            pmap.drawPath(path);
+            pmap.drawPolyline(pts.constData(), pts.size());
           }
           if (markers) {
             pmap.setPen(clr);
@@ -626,12 +628,12 @@ protected:
             }
           } else if (lines) {
             pmap.setPen(clr);
-            QPainterPath path;
-            path.moveTo(xstart, mapY(diffVal(arr, vec, start)));
-            for (int i = start + 1; i < end; ++i)
-              path.lineTo(xstart + (i - start) * xstep,
-                mapY(diffVal(arr, vec, i)));
-            pmap.drawPath(path);
+            QVector<QPointF> pts;
+            pts.reserve(count);
+            for (int i = start; i < end; ++i)
+              pts.append(QPointF(xstart + (i - start) * xstep,
+                mapY(diffVal(arr, vec, i))));
+            pmap.drawPolyline(pts.constData(), pts.size());
           }
           if (markers) {
             pmap.setPen(clr);
