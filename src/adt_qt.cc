@@ -119,6 +119,13 @@ struct AreaData
   int xStart = 0;
   int xEnd = -1;
 };
+struct ArrayData;
+
+struct GetCallbackData
+{
+  ArrayData *arr = nullptr;
+  int index = 0;
+};
 
 struct ArrayData
 {
@@ -131,6 +138,7 @@ struct ArrayData
   QVector<double> maxVals;
   QVector<bool> conn;
   QVector<chid> chids;
+  QVector<GetCallbackData> cbData;
   bool zoom = false;
   QString heading;
   QString units;
@@ -154,6 +162,7 @@ static PlotWidget *zoomPlot = nullptr;
 static AreaData *zoomAreaPtr = nullptr;
 static AreaWidget *zoomAreaWidget = nullptr;
 static void updateZoomCenter();
+static void getCallback(struct event_handler_args args);
 
 struct LoadItem
 {
@@ -1164,6 +1173,20 @@ static void updateZoomCenter()
     zoomAreaWidget->updateCenterSectSpin();
 }
 
+static void getCallback(struct event_handler_args args)
+{
+  GetCallbackData *cb = static_cast<GetCallbackData *>(args.usr);
+  if (!cb || !cb->arr)
+    return;
+  if (args.status == ECA_NORMAL && args.dbr) {
+    cb->arr->vals[cb->index] = *static_cast<const double *>(args.dbr);
+    cb->arr->conn[cb->index] = true;
+  } else {
+    cb->arr->vals[cb->index] = 0.0;
+    cb->arr->conn[cb->index] = false;
+  }
+}
+
 class MainWindow : public QMainWindow
 {
 public:
@@ -1560,16 +1583,12 @@ private:
     ca_poll();
     for (ArrayData &arr : arrays) {
       for (int i = 0; i < arr.nvals; ++i) {
-        if (arr.chids[i] && ca_state(arr.chids[i]) == cs_conn) {
-          ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
-          arr.conn[i] = true;
-        } else {
-          arr.vals[i] = 0.0;
+        if (!arr.chids[i] || ca_state(arr.chids[i]) != cs_conn) {
           arr.conn[i] = false;
+          arr.vals[i] = 0.0;
         }
       }
     }
-    ca_pend_io(1.0);
     for (ArrayData &arr : arrays) {
       double sum = 0.0;
       double sumsq = 0.0;
@@ -1610,6 +1629,14 @@ private:
     }
     for (auto aw : areaWidgets)
       aw->refresh();
+    for (ArrayData &arr : arrays) {
+      for (int i = 0; i < arr.nvals; ++i) {
+        if (arr.chids[i] && ca_state(arr.chids[i]) == cs_conn)
+          ca_array_get_callback(DBR_DOUBLE, 1, arr.chids[i], getCallback,
+            &arr.cbData[i]);
+      }
+    }
+    ca_flush_io();
   }
 
   void showStatus()
@@ -2324,6 +2351,7 @@ private:
       arr.maxVals.fill(-LARGEVAL, rows);
       arr.conn.fill(false, rows);
       arr.chids.clear();
+      arr.cbData.resize(rows);
 
       char **names = (char **)SDDS_GetColumn(&table, const_cast<char *>("ControlName"));
       if (!names) {
@@ -2343,6 +2371,8 @@ private:
         } else {
           arr.chids.append(0);
         }
+        arr.cbData[i].arr = &arr;
+        arr.cbData[i].index = i;
         SDDS_Free(names[i]);
       }
       SDDS_Free(names);
