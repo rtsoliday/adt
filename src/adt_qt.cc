@@ -1231,8 +1231,10 @@ public:
 
     QMenu *optionsMenu = menuBar()->addMenu("Options");
     QMenu *storeMenu = optionsMenu->addMenu("Store");
-    for (int i = 1; i <= NSAVE; ++i)
-      storeMenu->addAction(QString::number(i));
+    for (int i = 1; i <= NSAVE; ++i) {
+      QAction *act = storeMenu->addAction(QString::number(i));
+      connect(act, &QAction::triggered, this, [this, i]() { storeSet(i); });
+    }
     QMenu *displayMenu = optionsMenu->addMenu("Display");
     displayMenu->addAction("Off");
     for (int i = 1; i <= NSAVE; ++i)
@@ -1438,6 +1440,13 @@ public:
     int idx = n - 1;
     for (ArrayData &arr : arrays)
       arr.saveVals[idx] = arr.vals;
+    time_t now = std::time(nullptr);
+    char tbuf[26];
+    std::strncpy(tbuf, std::ctime(&now), 24);
+    tbuf[24] = '\0';
+    saveTime[idx] = QString::fromUtf8(tbuf);
+    saveFilename[idx].clear();
+    resetGraph();
   }
 
   void diffSet(int n)
