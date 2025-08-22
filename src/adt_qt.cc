@@ -405,6 +405,8 @@ protected:
     double upd = scale[area->currScale];
     double ymin = area->centerVal - upd * GRIDDIVISIONS;
     double ymax = area->centerVal + upd * GRIDDIVISIONS;
+    int bottom = plotRect.bottom();
+    double yscale = plotRect.height() / (ymax - ymin);
 
     auto mapY = [&](double v) {
       // Allow values to map outside of the visible plotting area so that
@@ -412,15 +414,16 @@ protected:
       // necessary. This avoids clamping out-of-range values to the plot
       // boundaries, which previously caused points to appear on the edge of
       // the graph.
-      double frac = (v - ymin) / (ymax - ymin);
-      return plotRect.bottom() - static_cast<int>(frac * plotRect.height());
+      return bottom - static_cast<int>((v - ymin) * yscale);
     };
 
+    bool refOnLoaded = referenceLoaded && refOn;
+    bool diffOn = diffSet >= 0;
     auto diffVal = [&](ArrayData *arr, const QVector<double> &vec, int idx) {
       double v = vec[idx];
-      if (referenceLoaded && refOn && arr->refVals.size() == arr->nvals)
+      if (refOnLoaded && arr->refVals.size() == arr->nvals)
         v -= arr->refVals[idx];
-      if (diffSet >= 0 && arr->saveVals[diffSet].size() == arr->nvals)
+      if (diffOn && arr->saveVals[diffSet].size() == arr->nvals)
         v -= arr->saveVals[diffSet][idx];
       return v;
     };
@@ -554,6 +557,7 @@ protected:
         const QColor &clr) {
         if (arr->nvals < 1 || vec.size() != arr->nvals)
           return;
+        pmap.setPen(clr);
         if (area == zoomAreaPtr) {
           int nvals = arr->nvals;
           int start = area->xStart % nvals;
@@ -569,43 +573,31 @@ protected:
           double smin = arr->s[start];
           double smax = arr->s[end] + (end < start ? stotal : 0.0);
           double range = smax - smin;
-          auto xpos = [&](int idx) {
+          double xscale = plotRect.width() / range;
+          QVector<QPointF> pts;
+          if (lines)
+            pts.reserve(count);
+          if (markers)
+            pmap.setBrush(clr);
+          for (int i = 0; i < count; ++i) {
+            int idx = (start + i) % nvals;
             double sval = arr->s[idx];
             if (idx < start)
               sval += stotal;
-            double frac = (sval - smin) / range;
-            return plotRect.left() + frac * plotRect.width();
-          };
-          if (bars) {
-            pmap.setPen(clr);
-            for (int i = 0; i < count; ++i) {
-              int idx = (start + i) % nvals;
-              int x = static_cast<int>(xpos(idx));
-              int y = mapY(diffVal(arr, vec, idx));
-              pmap.drawLine(x, y0, x, y);
-            }
-          } else if (lines) {
-            pmap.setPen(clr);
-            QVector<QPointF> pts;
-            pts.reserve(count);
-            for (int i = 0; i < count; ++i) {
-              int idx = (start + i) % nvals;
-              pts.append(QPointF(xpos(idx),
-                mapY(diffVal(arr, vec, idx))));
-            }
+            double x = plotRect.left() + (sval - smin) * xscale;
+            int y = mapY(diffVal(arr, vec, idx));
+            int xi = static_cast<int>(x);
+            if (bars)
+              pmap.drawLine(xi, y0, xi, y);
+            if (lines)
+              pts.append(QPointF(x, y));
+            if (markers)
+              pmap.drawRect(xi - 1, y - 1, 3, 3);
+          }
+          if (lines)
             pmap.drawPolyline(pts.constData(), pts.size());
-          }
-          if (markers) {
-            pmap.setPen(clr);
-            pmap.setBrush(clr);
-            for (int i = 0; i < count; ++i) {
-              int idx = (start + i) % nvals;
-              int x = static_cast<int>(xpos(idx));
-              int y = mapY(diffVal(arr, vec, idx));
-              pmap.drawRect(x - 1, y - 1, 3, 3);
-            }
+          if (markers)
             pmap.setBrush(Qt::NoBrush);
-          }
         } else {
           int start = area->xStart;
           int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
@@ -618,33 +610,26 @@ protected:
             return;
           double xstep = plotRect.width() /
             static_cast<double>(count);
-          double xstart = plotRect.left() + xstep / 2.0; // add half-bin margin
-          if (bars) {
-            pmap.setPen(clr);
-            for (int i = start; i < end; ++i) {
-              int x = static_cast<int>(xstart + (i - start) * xstep);
-              int y = mapY(diffVal(arr, vec, i));
-              pmap.drawLine(x, y0, x, y);
-            }
-          } else if (lines) {
-            pmap.setPen(clr);
-            QVector<QPointF> pts;
+          double x = plotRect.left() + xstep / 2.0;
+          QVector<QPointF> pts;
+          if (lines)
             pts.reserve(count);
-            for (int i = start; i < end; ++i)
-              pts.append(QPointF(xstart + (i - start) * xstep,
-                mapY(diffVal(arr, vec, i))));
-            pmap.drawPolyline(pts.constData(), pts.size());
-          }
-          if (markers) {
-            pmap.setPen(clr);
+          if (markers)
             pmap.setBrush(clr);
-            for (int i = start; i < end; ++i) {
-              int x = static_cast<int>(xstart + (i - start) * xstep);
-              int y = mapY(diffVal(arr, vec, i));
-              pmap.drawRect(x - 1, y - 1, 3, 3);
-            }
-            pmap.setBrush(Qt::NoBrush);
+          for (int i = start; i < end; ++i, x += xstep) {
+            int y = mapY(diffVal(arr, vec, i));
+            int xi = static_cast<int>(x);
+            if (bars)
+              pmap.drawLine(xi, y0, xi, y);
+            if (lines)
+              pts.append(QPointF(x, y));
+            if (markers)
+              pmap.drawRect(xi - 1, y - 1, 3, 3);
           }
+          if (lines)
+            pmap.drawPolyline(pts.constData(), pts.size());
+          if (markers)
+            pmap.setBrush(Qt::NoBrush);
         }
       };
 
