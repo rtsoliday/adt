@@ -877,7 +877,7 @@ public:
     auto controls = new QHBoxLayout;
     vbox->addLayout(controls);
 
-    auto scaleLabel = new QLabel("Scale:");
+    auto scaleLabel = new QLabel("Scale Interval:");
     controls->addWidget(scaleLabel);
     scaleSpin = new QDoubleSpinBox;
     scaleSpin->setDecimals(3);
@@ -889,7 +889,7 @@ public:
     scaleSpin->setSingleStep(step);
     controls->addWidget(scaleSpin);
 
-    auto centerLabel = new QLabel("Center:");
+    auto centerLabel = new QLabel("Scale Center:");
     controls->addWidget(centerLabel);
     centerSpin = new QDoubleSpinBox;
     centerSpin->setDecimals(3);
@@ -897,7 +897,7 @@ public:
     centerSpin->setValue(area->centerVal);
     controls->addWidget(centerSpin);
     if (isZoomPlot) {
-      auto intervalLabel = new QLabel("Interval:");
+      auto intervalLabel = new QLabel("Visible Sectors:");
       controls->addWidget(intervalLabel);
       intervalSpin = new QSpinBox;
       int max = nsect > 0 ? nsect : 1;
