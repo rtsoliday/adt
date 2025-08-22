@@ -89,6 +89,7 @@ static bool grid = true;
 static bool autoclear = true;
 static bool showmaxmin = true;
 static bool fillmaxmin = true;
+static int diffSet = -1;
 
 static int nsect = 0;
 static double stotal = 0.0;
@@ -102,6 +103,7 @@ struct AreaData
   int index = 0;
   int currScale = 0;
   double centerVal = 0.0;
+  double oldCenterVal = 0.0;
   double xmin = 0.0;
   double xmax = 0.0;
   bool initialized = false;
@@ -134,6 +136,7 @@ struct ArrayData
   double runMax = 0.0;
   AreaData *area = nullptr;
   QColor color;
+  QVector<double> saveVals[NSAVE];
 };
 
 class PlotWidget;
@@ -386,6 +389,13 @@ protected:
       return plotRect.bottom() - static_cast<int>(frac * plotRect.height());
     };
 
+    auto diffVal = [&](ArrayData *arr, const QVector<double> &vec, int idx) {
+      double v = vec[idx];
+      if (diffSet >= 0 && arr->saveVals[diffSet].size() == arr->nvals)
+        v -= arr->saveVals[diffSet][idx];
+      return v;
+    };
+
     if (grid) {
       pmap.setPen(Qt::gray);
       for (int i = -GRIDDIVISIONS; i <= GRIDDIVISIONS; ++i) {
@@ -426,33 +436,33 @@ protected:
           };
           if (fillmaxmin) {
             QPainterPath path;
-            path.moveTo(xpos(start), mapY(arr->minVals[start]));
+            path.moveTo(xpos(start), mapY(diffVal(arr, arr->minVals, start)));
             for (int i = 1; i < count; ++i) {
               int idx = (start + i) % nvals;
-              path.lineTo(xpos(idx), mapY(arr->minVals[idx]));
+              path.lineTo(xpos(idx), mapY(diffVal(arr, arr->minVals, idx)));
             }
             for (int i = count - 1; i >= 0; --i) {
               int idx = (start + i) % nvals;
-              path.lineTo(xpos(idx), mapY(arr->maxVals[idx]));
+              path.lineTo(xpos(idx), mapY(diffVal(arr, arr->maxVals, idx)));
             }
             path.closeSubpath();
             pmap.fillPath(path, Qt::lightGray);
           } else {
             pmap.setPen(arr->color);
             QPainterPath pathMin;
-            pathMin.moveTo(xpos(start), mapY(arr->minVals[start]));
+            pathMin.moveTo(xpos(start), mapY(diffVal(arr, arr->minVals, start)));
             for (int i = 1; i < count; ++i) {
               int idx = (start + i) % nvals;
               pathMin.lineTo(xpos(idx),
-                mapY(arr->minVals[idx]));
+                mapY(diffVal(arr, arr->minVals, idx)));
             }
             pmap.drawPath(pathMin);
             QPainterPath pathMax;
-            pathMax.moveTo(xpos(start), mapY(arr->maxVals[start]));
+            pathMax.moveTo(xpos(start), mapY(diffVal(arr, arr->maxVals, start)));
             for (int i = 1; i < count; ++i) {
               int idx = (start + i) % nvals;
               pathMax.lineTo(xpos(idx),
-                mapY(arr->maxVals[idx]));
+                mapY(diffVal(arr, arr->maxVals, idx)));
             }
             pmap.drawPath(pathMax);
             pmap.setPen(Qt::black);
@@ -472,28 +482,28 @@ protected:
           double xstart = plotRect.left() + xstep / 2.0;
           if (fillmaxmin) {
             QPainterPath path;
-            path.moveTo(xstart, mapY(arr->minVals[start]));
+            path.moveTo(xstart, mapY(diffVal(arr, arr->minVals, start)));
             for (int i = start + 1; i < end; ++i)
               path.lineTo(xstart + (i - start) * xstep,
-                mapY(arr->minVals[i]));
+                mapY(diffVal(arr, arr->minVals, i)));
             for (int i = end - 1; i >= start; --i)
               path.lineTo(xstart + (i - start) * xstep,
-                mapY(arr->maxVals[i]));
+                mapY(diffVal(arr, arr->maxVals, i)));
             path.closeSubpath();
             pmap.fillPath(path, Qt::lightGray);
           } else {
             pmap.setPen(arr->color);
             QPainterPath pathMin;
-            pathMin.moveTo(xstart, mapY(arr->minVals[start]));
+            pathMin.moveTo(xstart, mapY(diffVal(arr, arr->minVals, start)));
             for (int i = start + 1; i < end; ++i)
               pathMin.lineTo(xstart + (i - start) * xstep,
-                mapY(arr->minVals[i]));
+                mapY(diffVal(arr, arr->minVals, i)));
             pmap.drawPath(pathMin);
             QPainterPath pathMax;
-            pathMax.moveTo(xstart, mapY(arr->maxVals[start]));
+            pathMax.moveTo(xstart, mapY(diffVal(arr, arr->maxVals, start)));
             for (int i = start + 1; i < end; ++i)
               pathMax.lineTo(xstart + (i - start) * xstep,
-                mapY(arr->maxVals[i]));
+                mapY(diffVal(arr, arr->maxVals, i)));
             pmap.drawPath(pathMax);
             pmap.setPen(Qt::black);
           }
@@ -541,16 +551,16 @@ protected:
           for (int i = 0; i < count; ++i) {
             int idx = (start + i) % nvals;
             int x = static_cast<int>(xpos(idx));
-            int y = mapY(arr->vals[idx]);
+            int y = mapY(diffVal(arr, arr->vals, idx));
             pmap.drawLine(x, y0, x, y);
           }
         } else if (lines) {
           pmap.setPen(arr->color);
           QPainterPath path;
-          path.moveTo(xpos(start), mapY(arr->vals[start]));
+          path.moveTo(xpos(start), mapY(diffVal(arr, arr->vals, start)));
           for (int i = 1; i < count; ++i) {
             int idx = (start + i) % nvals;
-            path.lineTo(xpos(idx), mapY(arr->vals[idx]));
+            path.lineTo(xpos(idx), mapY(diffVal(arr, arr->vals, idx)));
           }
           pmap.drawPath(path);
         }
@@ -560,7 +570,7 @@ protected:
           for (int i = 0; i < count; ++i) {
             int idx = (start + i) % nvals;
             int x = static_cast<int>(xpos(idx));
-            int y = mapY(arr->vals[idx]);
+            int y = mapY(diffVal(arr, arr->vals, idx));
             pmap.drawRect(x - 1, y - 1, 3, 3);
           }
           pmap.setBrush(Qt::NoBrush);
@@ -582,15 +592,16 @@ protected:
           pmap.setPen(arr->color);
           for (int i = start; i < end; ++i) {
             int x = static_cast<int>(xstart + (i - start) * xstep);
-            int y = mapY(arr->vals[i]);
+            int y = mapY(diffVal(arr, arr->vals, i));
             pmap.drawLine(x, y0, x, y);
           }
         } else if (lines) {
           pmap.setPen(arr->color);
           QPainterPath path;
-          path.moveTo(xstart, mapY(arr->vals[start]));
+          path.moveTo(xstart, mapY(diffVal(arr, arr->vals, start)));
           for (int i = start + 1; i < end; ++i)
-            path.lineTo(xstart + (i - start) * xstep, mapY(arr->vals[i]));
+            path.lineTo(xstart + (i - start) * xstep,
+              mapY(diffVal(arr, arr->vals, i)));
           pmap.drawPath(path);
         }
         if (markers) {
@@ -598,7 +609,7 @@ protected:
           pmap.setBrush(arr->color);
           for (int i = start; i < end; ++i) {
             int x = static_cast<int>(xstart + (i - start) * xstep);
-            int y = mapY(arr->vals[i]);
+            int y = mapY(diffVal(arr, arr->vals, i));
             pmap.drawRect(x - 1, y - 1, 3, 3);
           }
           pmap.setBrush(Qt::NoBrush);
@@ -1362,6 +1373,43 @@ public:
     zoomAreaWidget = nullptr;
   }
 
+  void storeSet(int n)
+  {
+    if (n < 1 || n > NSAVE || arrays.isEmpty())
+      return;
+    int idx = n - 1;
+    for (ArrayData &arr : arrays)
+      arr.saveVals[idx] = arr.vals;
+  }
+
+  void diffSet(int n)
+  {
+    if (n >= 1 && n <= NSAVE) {
+      ::diffSet = n - 1;
+      for (AreaData &area : areas) {
+        area.oldCenterVal = area.centerVal;
+        area.centerVal = 0.0;
+        area.tempclear = true;
+      }
+      if (zoomWidget) {
+        zoomArea.oldCenterVal = zoomArea.centerVal;
+        zoomArea.centerVal = 0.0;
+        zoomArea.tempclear = true;
+      }
+    } else {
+      ::diffSet = -1;
+      for (AreaData &area : areas) {
+        area.centerVal = area.oldCenterVal;
+        area.tempclear = true;
+      }
+      if (zoomWidget) {
+        zoomArea.centerVal = zoomArea.oldCenterVal;
+        zoomArea.tempclear = true;
+      }
+    }
+    resetGraph();
+  }
+
 private:
   QString adtHome;
   QString customDirectory;
@@ -1799,6 +1847,7 @@ private:
         if (!SDDS_GetParameterAsDouble(&table, const_cast<char *>("ADTCenterVal"), &center))
           center = 0.0;
         area.centerVal = center;
+        area.oldCenterVal = area.centerVal;
         double upd;
         if (!SDDS_GetParameterAsDouble(&table, const_cast<char *>("ADTUnitsPerDiv"), &upd))
           upd = 1.0;
@@ -1943,6 +1992,7 @@ private:
     if (!zarrs.isEmpty()) {
       zoomArea.currScale = maxScale;
       zoomArea.centerVal = avgCenter / zarrs.size();
+      zoomArea.oldCenterVal = zoomArea.centerVal;
       zoomArea.xmax = zoomArea.centerVal +
         scale[zoomArea.currScale] * GRIDDIVISIONS;
       zoomArea.xmin = zoomArea.centerVal -
@@ -1994,6 +2044,7 @@ int main(int argc, char **argv)
   bool homeSpecified = false;
   int zoomSect = 0;
   int zoomInt = 0;
+  bool diffMode = false;
   QStringList args = app.arguments();
   for (int i = 1; i < args.size(); ++i) {
     const QString &arg = args.at(i);
@@ -2006,9 +2057,13 @@ int main(int argc, char **argv)
       zoomSect = args.at(++i).toInt();
     } else if ((arg == "-z" || arg == "/z") && i + 1 < args.size()) {
       zoomInt = args.at(++i).toInt();
+    } else if (arg == "-d" || arg == "/d") {
+      diffMode = true;
     }
   }
   MainWindow win(homeOverride, homeSpecified, startPv, zoomSect, zoomInt);
   win.show();
+  if (diffMode)
+    QTimer::singleShot(1000, &win, [&win]() { win.storeSet(1); win.diffSet(1); });
   return app.exec();
 }
