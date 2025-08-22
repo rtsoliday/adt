@@ -1217,8 +1217,10 @@ public:
     QMenu *plotMenu = fileMenu->addMenu("Plot");
     QAction *plotCurAct = plotMenu->addAction("Current");
     connect(plotCurAct, &QAction::triggered, this, [this]() { plotCurrent(); });
-    for (int i = 1; i <= NSAVE; ++i)
-      plotMenu->addAction(QString::number(i));
+    for (int i = 1; i <= NSAVE; ++i) {
+      QAction *act = plotMenu->addAction(QString::number(i));
+      connect(act, &QAction::triggered, this, [this, i]() { plotSaved(i); });
+    }
     QAction *statusAct = fileMenu->addAction("Status...");
     connect(statusAct, &QAction::triggered, this, [this]() { showStatus(); });
     fileMenu->addSeparator();
@@ -1609,16 +1611,28 @@ private:
     dlg.exec();
   }
 
-  bool writePlotFile(const QString &filename)
+  bool writePlotFile(const QString &filename, int nsave = -1)
   {
     FILE *file = fopen(filename.toUtf8().constData(), "w");
     if (!file)
       return false;
 
-    time_t now = std::time(nullptr);
     char tbuf[26];
-    std::strncpy(tbuf, std::ctime(&now), 24);
-    tbuf[24] = '\0';
+    if (nsave < 0) {
+      time_t now = std::time(nullptr);
+      std::strncpy(tbuf, std::ctime(&now), 24);
+      tbuf[24] = '\0';
+    } else {
+      if (nsave >= NSAVE || saveTime[nsave].isEmpty()) {
+        fclose(file);
+        QMessageBox::warning(this, "ADT",
+          QString("Data is not defined for set %1").arg(nsave + 1));
+        return false;
+      }
+      QByteArray st = saveTime[nsave].toUtf8();
+      std::strncpy(tbuf, st.constData(), 24);
+      tbuf[24] = '\0';
+    }
 
     fprintf(file, "%s\n", SDDSID);
     fprintf(file, "&description text=\"ADT Plot from %s\" &end\n",
@@ -1642,6 +1656,18 @@ private:
     fprintf(file,
       "&data mode=ascii no_row_counts=1 additional_header_lines=1 &end\n");
     for (const ArrayData &arr : arrays) {
+      const QVector<double> *vals = nullptr;
+      if (nsave < 0) {
+        vals = &arr.vals;
+      } else {
+        if (arr.saveVals[nsave].size() != arr.nvals) {
+          fclose(file);
+          QMessageBox::warning(this, "ADT",
+            QString("Data is not defined for set %1").arg(nsave + 1));
+          return false;
+        }
+        vals = &arr.saveVals[nsave];
+      }
       fprintf(file, "\n");
       fprintf(file, "%s\n", arr.heading.toUtf8().constData());
       fprintf(file, "%s\n", arr.units.toUtf8().constData());
@@ -1650,7 +1676,7 @@ private:
       fprintf(file, "%d     !ADTDisplayArea\n", arr.area->index + 1);
       for (int i = 0; i < arr.nvals; ++i) {
         fprintf(file, "%d %s % f\n", i + 1,
-          arr.names[i].toUtf8().constData(), arr.vals[i]);
+          arr.names[i].toUtf8().constData(), (*vals)[i]);
       }
     }
     fclose(file);
@@ -1970,6 +1996,41 @@ private:
     QString fname = tmp.fileName();
     tmp.close();
     if (!writePlotFile(fname)) {
+      QFile::remove(fname);
+      return;
+    }
+    QString cmd = QString(
+      "sddsplot -graph=sym,connect -layout=1,2 -split=page -sep "
+      "-ylabel=@TimeStamp -xlabel=Index -column=Index,Value \"%1\" "
+      "-title=@ADTScreenTitle -end ; rm \"%1\"").arg(fname);
+    QProcess::startDetached("/bin/sh", QStringList() << "-c" << cmd);
+  }
+
+  void plotSaved(int n)
+  {
+    if (arrays.isEmpty()) {
+      QMessageBox::warning(this, "ADT", "There are no PV's defined");
+      return;
+    }
+    if (n < 1 || n > NSAVE)
+      return;
+    int idx = n - 1;
+    for (const ArrayData &arr : arrays) {
+      if (arr.saveVals[idx].size() != arr.nvals) {
+        QMessageBox::warning(this, "ADT",
+          QString("Data is not defined for set %1").arg(n));
+        return;
+      }
+    }
+    QTemporaryFile tmp(QDir::tempPath() + "/ADTPlotXXXXXX.sdds");
+    tmp.setAutoRemove(false);
+    if (!tmp.open()) {
+      QMessageBox::warning(this, "ADT", "Unable to create temp file");
+      return;
+    }
+    QString fname = tmp.fileName();
+    tmp.close();
+    if (!writePlotFile(fname, idx)) {
       QFile::remove(fname);
       return;
     }
