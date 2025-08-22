@@ -2036,6 +2036,18 @@ private:
   }
 };
 
+static void usage(const char *prog) {
+  fprintf(stderr,
+    "Usage: %s [-a directory] [-f pvfile] [-s center_sector] [-z number_of_sectors] [-d] [-h|-?]\n"
+    "  -a <directory>          specify ADT home directory\n"
+    "  -f <file>               open PV file at startup\n"
+    "  -s <center_sector>      set initial zoomed on sector\n"
+    "  -z <number_of_sectors>  set initial zoom range\n"
+    "  -d                      enable diff mode\n"
+    "  -h, -?                  show this help message and exit\n",
+    prog);
+}
+
 int main(int argc, char **argv)
 {
   QApplication app(argc, argv);
@@ -2045,6 +2057,7 @@ int main(int argc, char **argv)
   int zoomSect = 0;
   int zoomInt = 0;
   bool diffMode = false;
+  bool showHelp = false;
   QStringList args = app.arguments();
   for (int i = 1; i < args.size(); ++i) {
     const QString &arg = args.at(i);
@@ -2059,7 +2072,13 @@ int main(int argc, char **argv)
       zoomInt = args.at(++i).toInt();
     } else if (arg == "-d" || arg == "/d") {
       diffMode = true;
+    } else if (arg == "-h" || arg == "/h" || arg == "-?" || arg == "/?") {
+      showHelp = true;
     }
+  }
+  if (showHelp) {
+    usage(argv[0]);
+    return 0;
   }
   MainWindow win(homeOverride, homeSpecified, startPv, zoomSect, zoomInt);
   win.show();
