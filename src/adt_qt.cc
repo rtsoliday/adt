@@ -1240,9 +1240,12 @@ public:
     for (int i = 1; i <= NSAVE; ++i)
       displayMenu->addAction(QString::number(i));
     QMenu *diffMenu = optionsMenu->addMenu("Difference");
-    diffMenu->addAction("Off");
-    for (int i = 1; i <= NSAVE; ++i)
-      diffMenu->addAction(QString::number(i));
+    QAction *diffOffAct = diffMenu->addAction("Off");
+    connect(diffOffAct, &QAction::triggered, this, [this]() { diffSet(0); });
+    for (int i = 1; i <= NSAVE; ++i) {
+      QAction *act = diffMenu->addAction(QString::number(i));
+      connect(act, &QAction::triggered, this, [this, i]() { diffSet(i); });
+    }
     refAct = optionsMenu->addAction("Reference Enabled");
     refAct->setCheckable(true);
     refAct->setChecked(refOn);
@@ -1452,17 +1455,19 @@ public:
   void diffSet(int n)
   {
     if (n >= 1 && n <= NSAVE) {
+      if (::diffSet < 0) {
+        for (AreaData &area : areas) {
+          area.oldCenterVal = area.centerVal;
+          area.centerVal = 0.0;
+          area.tempclear = true;
+        }
+        if (zoomWidget) {
+          zoomArea.oldCenterVal = zoomArea.centerVal;
+          zoomArea.centerVal = 0.0;
+          zoomArea.tempclear = true;
+        }
+      }
       ::diffSet = n - 1;
-      for (AreaData &area : areas) {
-        area.oldCenterVal = area.centerVal;
-        area.centerVal = 0.0;
-        area.tempclear = true;
-      }
-      if (zoomWidget) {
-        zoomArea.oldCenterVal = zoomArea.centerVal;
-        zoomArea.centerVal = 0.0;
-        zoomArea.tempclear = true;
-      }
     } else {
       ::diffSet = -1;
       for (AreaData &area : areas) {
