@@ -1502,20 +1502,27 @@ private:
       double sum = 0.0;
       double sumsq = 0.0;
       double maxv = 0.0;
+      int nconn = 0;
+      bool haveMax = false;
       for (int i = 0; i < arr.nvals; ++i) {
+        if (!arr.conn[i])
+          continue;
         double v = arr.vals[i];
         sum += v;
         sumsq += v * v;
-        if (i == 0 || std::fabs(v) > std::fabs(maxv))
+        if (!haveMax || std::fabs(v) > std::fabs(maxv)) {
           maxv = v;
+          haveMax = true;
+        }
         if (v < arr.minVals[i])
           arr.minVals[i] = v;
         if (v > arr.maxVals[i])
           arr.maxVals[i] = v;
+        ++nconn;
       }
-      if (arr.nvals > 0) {
-        arr.avg = sum / arr.nvals;
-        arr.sdev = std::sqrt(sumsq / arr.nvals - arr.avg * arr.avg);
+      if (nconn > 0) {
+        arr.avg = sum / nconn;
+        arr.sdev = std::sqrt(sumsq / nconn - arr.avg * arr.avg);
         arr.maxVal = maxv;
       } else {
         arr.avg = arr.sdev = arr.maxVal = 0.0;
@@ -1979,18 +1986,25 @@ private:
       double sum = 0.0;
       double sumsq = 0.0;
       double maxv = 0.0;
+      int nconn = 0;
+      bool haveMax = false;
       for (int i = 0; i < arr.nvals; ++i) {
+        if (!arr.conn[i])
+          continue;
         double v = arr.vals[i];
         sum += v;
         sumsq += v * v;
-        if (i == 0 || std::fabs(v) > std::fabs(maxv))
+        if (!haveMax || std::fabs(v) > std::fabs(maxv)) {
           maxv = v;
+          haveMax = true;
+        }
         arr.minVals[i] = v;
         arr.maxVals[i] = v;
+        ++nconn;
       }
-      if (arr.nvals > 0) {
-        arr.avg = sum / arr.nvals;
-        arr.sdev = std::sqrt(sumsq / arr.nvals - arr.avg * arr.avg);
+      if (nconn > 0) {
+        arr.avg = sum / nconn;
+        arr.sdev = std::sqrt(sumsq / nconn - arr.avg * arr.avg);
         arr.maxVal = maxv;
       } else {
         arr.avg = arr.sdev = arr.maxVal = 0.0;
