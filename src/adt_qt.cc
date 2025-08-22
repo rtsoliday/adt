@@ -1212,8 +1212,10 @@ public:
     QMenu *writeMenu = fileMenu->addMenu("Write");
     QAction *writeCurAct = writeMenu->addAction("Current");
     connect(writeCurAct, &QAction::triggered, this, [this]() { writeCurrent(); });
-    for (int i = 1; i <= NSAVE; ++i)
-      writeMenu->addAction(QString::number(i));
+    for (int i = 1; i <= NSAVE; ++i) {
+      QAction *act = writeMenu->addAction(QString::number(i));
+      connect(act, &QAction::triggered, this, [this, i]() { writeSaved(i); });
+    }
     QMenu *plotMenu = fileMenu->addMenu("Plot");
     QAction *plotCurAct = plotMenu->addAction("Current");
     connect(plotCurAct, &QAction::triggered, this, [this]() { plotCurrent(); });
@@ -1895,7 +1897,7 @@ private:
     resetGraph();
   }
 
-  bool writeSnapFile(const QString &filename)
+  bool writeSnapFile(const QString &filename, int nsave = -1)
   {
     FILE *file = fopen(filename.toUtf8().constData(), "w");
     if (!file) {
@@ -1904,10 +1906,22 @@ private:
       return false;
     }
 
-    time_t clock = std::time(nullptr);
     char tbuf[26];
-    std::strncpy(tbuf, std::ctime(&clock), 24);
-    tbuf[24] = '\0';
+    if (nsave < 0) {
+      time_t clock = std::time(nullptr);
+      std::strncpy(tbuf, std::ctime(&clock), 24);
+      tbuf[24] = '\0';
+    } else {
+      if (nsave >= NSAVE || saveTime[nsave].isEmpty()) {
+        fclose(file);
+        QMessageBox::warning(this, "ADT",
+          QString("Data is not defined for set %1").arg(nsave + 1));
+        return false;
+      }
+      QByteArray st = saveTime[nsave].toUtf8();
+      std::strncpy(tbuf, st.constData(), 24);
+      tbuf[24] = '\0';
+    }
 
     fprintf(file, "%s\n", SDDSID);
     fprintf(file,
@@ -1930,12 +1944,24 @@ private:
     fprintf(file,
       "&data mode=ascii no_row_counts=1 additional_header_lines=1 &end\n");
     for (const ArrayData &arr : arrays) {
+      const QVector<double> *vals = nullptr;
+      if (nsave < 0) {
+        vals = &arr.vals;
+      } else {
+        if (arr.saveVals[nsave].size() != arr.nvals) {
+          fclose(file);
+          QMessageBox::warning(this, "ADT",
+            QString("Data is not defined for set %1").arg(nsave + 1));
+          return false;
+        }
+        vals = &arr.saveVals[nsave];
+      }
       fprintf(file, "\n");
       fprintf(file, "%s (%s)\n", arr.heading.toUtf8().constData(),
         arr.units.toUtf8().constData());
       for (int i = 0; i < arr.nvals; ++i) {
         fprintf(file, "%s pv - 1 %f\n",
-          arr.names[i].toUtf8().constData(), arr.vals[i]);
+          arr.names[i].toUtf8().constData(), (*vals)[i]);
       }
     }
     fclose(file);
@@ -1979,6 +2005,23 @@ private:
     if (fn.isEmpty())
       return;
     writeSnapFile(fn);
+  }
+
+  void writeSaved(int n)
+  {
+    if (arrays.isEmpty()) {
+      QMessageBox::warning(this, "ADT", "There are no PV's defined");
+      return;
+    }
+    if (n < 1 || n > NSAVE)
+      return;
+    int idx = n - 1;
+    QString dir = QDir::currentPath();
+    QString fn = QFileDialog::getSaveFileName(this, "Write Snapshot File",
+      dir, "Snapshot Files (*.snap)");
+    if (fn.isEmpty())
+      return;
+    writeSnapFile(fn, idx);
   }
 
   void plotCurrent()
