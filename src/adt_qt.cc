@@ -1,6 +1,14 @@
 /**
  * @file adt_qt.cc
  * @brief Minimal Qt-based entry for ADT.
+ *
+ * Provides the Qt-based front end for the Array Display Tool.
+ *
+ * @author Robert Soliday
+ * @copyright
+ * Copyright (c) 2002 The University of Chicago, as Operator of Argonne National Laboratory.
+ * Copyright (c) 2002 The Regents of the University of California, as Operator of Los Alamos National Laboratory.
+ * Distributed subject to a Software License Agreement found in the file LICENSE that is included with this distribution.
  */
 
 #include "aps.icon"
@@ -162,17 +170,38 @@ struct LoadMenuInfo
   QList<LoadItem> items;
 };
 
+/**
+ * @brief Construct the plotting rectangle.
+ *
+ * @param w Widget width in pixels.
+ * @param h Widget height in pixels.
+ * @param headerHeight Height reserved for the header area.
+ * @return QRect defining the plot bounds.
+ */
 static QRect makePlotRect(int w, int h, int headerHeight = 0)
 {
   return QRect(0, headerHeight, w - 1, h - headerHeight - 1);
 }
 
+/**
+ * @brief Wrap an index within bounds.
+ *
+ * @param idx Candidate index value.
+ * @param n Size of the range.
+ * @return Wrapped index in [0, n).
+ */
 static int wrapIndex(int idx, int n)
 {
   idx %= n;
   return idx < 0 ? idx + n : idx;
 }
 
+/**
+ * @brief Free arrays of strings allocated by SDDS routines.
+ *
+ * @param n Number of strings.
+ * @param p Pointer to array of C strings.
+ */
 static void freeSddsStrings(int n, char **p)
 {
   if (!p)
@@ -182,6 +211,17 @@ static void freeSddsStrings(int n, char **p)
   SDDS_Free(p);
 }
 
+/**
+ * @brief Read initialization file for menu configuration.
+ *
+ * Parses the ADT rc file to populate menus and directories.
+ *
+ * @param filename Path to the initialization file.
+ * @param adtHome ADT installation directory.
+ * @param pvDirectory Output path for standard PV directory.
+ * @param customDirectory Output path for custom PV directory.
+ * @return List of menu items discovered in the file.
+ */
 static QList<LoadMenuInfo> readInitFile(const QString &filename,
   const QString &adtHome, QString &pvDirectory, QString &customDirectory)
 {
@@ -1062,6 +1102,9 @@ public:
   }
 
 private:
+  /**
+   * @brief Queue a plot redraw on the next event loop cycle.
+   */
   void schedulePlotUpdate()
   {
     if (plotUpdatePending)
@@ -1074,6 +1117,9 @@ private:
     });
   }
 
+  /**
+   * @brief Update statistics labels for displayed arrays.
+   */
   void updateStats()
   {
     for (int i = 0; i < arrayPtrs.size() && i < stats.size(); ++i) {
@@ -1111,12 +1157,20 @@ private:
   bool plotUpdatePending = false;
 };
 
+/**
+ * @brief Synchronize the zoom plot center widget.
+ */
 static void updateZoomCenter()
 {
   if (zoomAreaWidget)
     zoomAreaWidget->updateCenterSectSpin();
 }
 
+/**
+ * @brief CA get callback for PV updates.
+ *
+ * @param args Channel Access event arguments.
+ */
 static void getCallback(struct event_handler_args args)
 {
   GetCallbackData *cb = static_cast<GetCallbackData *>(args.usr);
@@ -1131,6 +1185,9 @@ static void getCallback(struct event_handler_args args)
   }
 }
 
+/**
+ * @brief Main application window for ADT.
+ */
 class MainWindow : public QMainWindow
 {
 public:
@@ -2357,7 +2414,7 @@ private:
         "Timeout connecting to PVs.", QMessageBox::NoButton, this);
       timeoutBox->setAttribute(Qt::WA_DeleteOnClose);
       timeoutBox->show();
-      QTimer::singleShot(5000, timeoutBox, &QMessageBox::accept);
+      QTimer::singleShot(3000, timeoutBox, &QMessageBox::accept);
     }
 
     for (ArrayData &arr : arrays) {
