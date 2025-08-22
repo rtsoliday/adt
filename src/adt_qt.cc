@@ -1064,6 +1064,20 @@ public:
     centerSectSpin->blockSignals(false);
   }
 
+  /**
+   * @brief Set initial zoom parameters.
+   *
+   * @param centerSect Sector to center the zoom on (1-based).
+   * @param interval Number of sectors to display.
+   */
+  void setZoom(int centerSect, int interval)
+  {
+    if (intervalSpin && interval > 0)
+      intervalSpin->setValue(interval);
+    if (centerSectSpin && centerSect > 0)
+      centerSectSpin->setValue(centerSect);
+  }
+
 private:
   void updateStats()
   {
@@ -1106,8 +1120,9 @@ class MainWindow : public QMainWindow
 {
 public:
   explicit MainWindow(const QString &homeOverride, bool homeSpecified,
-    const QString &startupPv, QWidget *parent = nullptr)
-    : QMainWindow(parent)
+    const QString &startupPv, int zoomSect, int zoomInt,
+    QWidget *parent = nullptr)
+    : QMainWindow(parent), initZoomSector(zoomSect), initZoomInterval(zoomInt)
   {
     auto logo = new LogoWidget(this);
     setCentralWidget(logo);
@@ -1362,6 +1377,10 @@ private:
   QAction *zoomAct = nullptr;
   AreaData zoomArea;
   bool zoomOn = true;
+  int initZoomSector = 0;
+  int initZoomInterval = 0;
+  bool zoomSectorUsed = false;
+  bool zoomIntervalUsed = false;
   QVector<chid> channels;
   QTimer *pollTimer = nullptr;
   int timeInterval = 2000;
@@ -1945,6 +1964,20 @@ private:
       zoomPlot = zoomWidget->plotWidget();
       zoomAreaPtr = &zoomArea;
       zoomAreaWidget = zoomWidget;
+      if (!zoomSectorUsed || !zoomIntervalUsed) {
+        int center = 0;
+        int interval = 0;
+        if (!zoomSectorUsed && initZoomSector > 0) {
+          center = initZoomSector;
+          zoomSectorUsed = true;
+        }
+        if (!zoomIntervalUsed && initZoomInterval > 0) {
+          interval = initZoomInterval;
+          zoomIntervalUsed = true;
+        }
+        if (center > 0 || interval > 0)
+          zoomWidget->setZoom(center, interval);
+      }
     }
     setCentralWidget(central);
 
@@ -1959,6 +1992,8 @@ int main(int argc, char **argv)
   QString startPv;
   QString homeOverride;
   bool homeSpecified = false;
+  int zoomSect = 0;
+  int zoomInt = 0;
   QStringList args = app.arguments();
   for (int i = 1; i < args.size(); ++i) {
     const QString &arg = args.at(i);
@@ -1967,9 +2002,13 @@ int main(int argc, char **argv)
       homeSpecified = true;
     } else if ((arg == "-f" || arg == "/f") && i + 1 < args.size()) {
       startPv = args.at(++i);
+    } else if ((arg == "-s" || arg == "/s") && i + 1 < args.size()) {
+      zoomSect = args.at(++i).toInt();
+    } else if ((arg == "-z" || arg == "/z") && i + 1 < args.size()) {
+      zoomInt = args.at(++i).toInt();
     }
   }
-  MainWindow win(homeOverride, homeSpecified, startPv);
+  MainWindow win(homeOverride, homeSpecified, startPv, zoomSect, zoomInt);
   win.show();
   return app.exec();
 }
