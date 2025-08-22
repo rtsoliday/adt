@@ -468,18 +468,22 @@ protected:
             return plotRect.left() + frac * plotRect.width();
           };
           if (fillmaxmin) {
-            QPainterPath path;
-            path.moveTo(xpos(start), mapY(diffVal(arr, arr->minVals, start)));
-            for (int i = 1; i < count; ++i) {
+            QVector<QPointF> poly(2 * count);
+            for (int i = 0; i < count; ++i) {
               int idx = (start + i) % nvals;
-              path.lineTo(xpos(idx), mapY(diffVal(arr, arr->minVals, idx)));
+              poly[i] = QPointF(xpos(idx),
+                mapY(diffVal(arr, arr->minVals, idx)));
             }
-            for (int i = count - 1; i >= 0; --i) {
-              int idx = (start + i) % nvals;
-              path.lineTo(xpos(idx), mapY(diffVal(arr, arr->maxVals, idx)));
+            for (int i = 0; i < count; ++i) {
+              int idx = (start + count - 1 - i) % nvals;
+              poly[count + i] = QPointF(xpos(idx),
+                mapY(diffVal(arr, arr->maxVals, idx)));
             }
-            path.closeSubpath();
-            pmap.fillPath(path, Qt::lightGray);
+            pmap.save();
+            pmap.setPen(Qt::NoPen);
+            pmap.setBrush(Qt::lightGray);
+            pmap.drawPolygon(poly.constData(), poly.size());
+            pmap.restore();
           } else {
             pmap.setPen(arr->color);
             tmpPts.resize(count);
@@ -511,16 +515,22 @@ protected:
             static_cast<double>(count);
           double xstart = plotRect.left() + xstep / 2.0;
           if (fillmaxmin) {
-            QPainterPath path;
-            path.moveTo(xstart, mapY(diffVal(arr, arr->minVals, start)));
-            for (int i = start + 1; i < end; ++i)
-              path.lineTo(xstart + (i - start) * xstep,
-                mapY(diffVal(arr, arr->minVals, i)));
-            for (int i = end - 1; i >= start; --i)
-              path.lineTo(xstart + (i - start) * xstep,
-                mapY(diffVal(arr, arr->maxVals, i)));
-            path.closeSubpath();
-            pmap.fillPath(path, Qt::lightGray);
+            QVector<QPointF> poly(2 * count);
+            for (int i = 0; i < count; ++i) {
+              int idx = start + i;
+              poly[i] = QPointF(xstart + i * xstep,
+                mapY(diffVal(arr, arr->minVals, idx)));
+            }
+            for (int i = 0; i < count; ++i) {
+              int idx = start + count - 1 - i;
+              poly[count + i] = QPointF(xstart + (count - 1 - i) * xstep,
+                mapY(diffVal(arr, arr->maxVals, idx)));
+            }
+            pmap.save();
+            pmap.setPen(Qt::NoPen);
+            pmap.setBrush(Qt::lightGray);
+            pmap.drawPolygon(poly.constData(), poly.size());
+            pmap.restore();
           } else {
             pmap.setPen(arr->color);
             tmpPts.resize(count);
