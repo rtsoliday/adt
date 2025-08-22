@@ -895,6 +895,7 @@ public:
     centerSpin->setDecimals(3);
     centerSpin->setRange(-LARGEVAL, LARGEVAL);
     centerSpin->setValue(area->centerVal);
+    centerSpin->setSingleStep(scaleSpin->value());
     controls->addWidget(centerSpin);
     if (isZoomPlot) {
       auto intervalLabel = new QLabel("Visible Sectors:");
@@ -936,6 +937,7 @@ public:
         scale[iscale] - scale[iscale - 1] :
         (NSCALES > 1 ? scale[1] - scale[0] : scale[0]);
       scaleSpin->setSingleStep(step);
+      centerSpin->setSingleStep(scale[iscale]);
       scaleSpin->blockSignals(false);
       plot->update();
     });
