@@ -27,6 +27,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPainterPath>
+#include <QPen>
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QDoubleSpinBox>
@@ -568,10 +569,8 @@ protected:
           double smax = arr->s[end] + (end < start ? stotal : 0.0);
           double range = smax - smin;
           double xscale = plotRect.width() / range;
-          if (lines)
+          if (lines || markers)
             tmpPts.resize(count);
-          if (markers)
-            pmap.setBrush(clr);
           for (int i = 0; i < count; ++i) {
             int idx = (start + i) % nvals;
             double sval = arr->s[idx];
@@ -582,15 +581,19 @@ protected:
             int xi = static_cast<int>(x);
             if (bars)
               pmap.drawLine(xi, y0, xi, y);
-            if (lines)
+            if (lines || markers)
               tmpPts[i] = QPointF(x, y);
-            if (markers)
-              pmap.drawRect(xi - 1, y - 1, 3, 3);
           }
           if (lines)
             pmap.drawPolyline(tmpPts.constData(), count);
-          if (markers)
-            pmap.setBrush(Qt::NoBrush);
+          if (markers) {
+            QPen oldPen = pmap.pen();
+            QPen markerPen(clr, 3);
+            markerPen.setCapStyle(Qt::SquareCap);
+            pmap.setPen(markerPen);
+            pmap.drawPoints(tmpPts.constData(), count);
+            pmap.setPen(oldPen);
+          }
         } else {
           int start = area->xStart;
           int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
@@ -604,24 +607,26 @@ protected:
           double xstep = plotRect.width() /
             static_cast<double>(count);
           double x = plotRect.left() + xstep / 2.0;
-          if (lines)
+          if (lines || markers)
             tmpPts.resize(count);
-          if (markers)
-            pmap.setBrush(clr);
           for (int i = start; i < end; ++i, x += xstep) {
             int y = mapY(diffVal(arr, vec, i));
             int xi = static_cast<int>(x);
             if (bars)
               pmap.drawLine(xi, y0, xi, y);
-            if (lines)
+            if (lines || markers)
               tmpPts[i - start] = QPointF(x, y);
-            if (markers)
-              pmap.drawRect(xi - 1, y - 1, 3, 3);
           }
           if (lines)
             pmap.drawPolyline(tmpPts.constData(), count);
-          if (markers)
-            pmap.setBrush(Qt::NoBrush);
+          if (markers) {
+            QPen oldPen = pmap.pen();
+            QPen markerPen(clr, 3);
+            markerPen.setCapStyle(Qt::SquareCap);
+            pmap.setPen(markerPen);
+            pmap.drawPoints(tmpPts.constData(), count);
+            pmap.setPen(oldPen);
+          }
         }
       };
 
