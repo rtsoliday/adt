@@ -26,7 +26,6 @@
 #include <QPainter>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QPainterPath>
 #include <QPen>
 #include <QMessageBox>
 #include <QMouseEvent>
@@ -52,14 +51,12 @@
 #include <cmath>
 #include <algorithm>
 #include <cstring>
-#include <cstdint>
 #include <cstdio>
 #include <ctime>
 
 #include <SDDS.h>
 #include <QDir>
 #include <cadef.h>
-#include <iostream>
 
 #define INITFILENAME "adtrc"
 
