@@ -513,6 +513,20 @@ protected:
       }
     }
 
+    if (this == zoomPlot) {
+      pmap.setPen(Qt::black);
+      pmap.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+      double xstep = plotRect.width() / 10.0;
+      int bottom = plotRect.bottom();
+      for (int i = 0; i <= 10; ++i) {
+        int x = static_cast<int>(plotRect.left() + i * xstep);
+        pmap.drawLine(x, bottom, x, bottom - 2);
+        QString label = QString::number(i);
+        QRect tr(x - 10, bottom - 15, 20, 16);
+        pmap.drawText(tr, Qt::AlignTop | Qt::AlignHCenter, label);
+      }
+    }
+
     QPainter pw(this);
     pw.drawPixmap(0, 0, pixmap);
   }
