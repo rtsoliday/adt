@@ -25,3 +25,18 @@ make
 ```
 
 This compiles the Qt version and starts ADT with the sample PV file.
+
+## Configuration File
+
+ADT looks for a configuration file named `adtrc` to locate PV and snapshot
+directories and populate the File/Load menu. The file is searched for in the
+following locations, in order:
+
+1. the directory specified with `-a <adthome>`
+2. `$HOME/.adtrc`
+3. `$ADTHOME/adtrc`
+4. the current working directory
+
+If no configuration file is found, ADT defaults to using `./pv` and `./snap`
+and shows only the Custom option in the File/Load menu. An example
+configuration file is provided at `src/adtrc`.
