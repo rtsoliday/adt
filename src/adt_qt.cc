@@ -988,7 +988,7 @@ public:
       scaleSpin->setSingleStep(step);
       centerSpin->setSingleStep(scale[iscale]);
       scaleSpin->blockSignals(false);
-      plot->update();
+      schedulePlotUpdate();
     });
 
     connect(centerSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
@@ -997,7 +997,7 @@ public:
       area->centerVal = val;
       area->xmax = area->centerVal + scale[area->currScale] * GRIDDIVISIONS;
       area->xmin = area->centerVal - scale[area->currScale] * GRIDDIVISIONS;
-      plot->update();
+      schedulePlotUpdate();
     });
 
     if (intervalSpin) {
@@ -1024,7 +1024,7 @@ public:
         int end = (start + span - 1) % nvals;
         area->xStart = start;
         area->xEnd = end;
-        plot->update();
+        schedulePlotUpdate();
         updateCenterSectSpin();
       });
       connect(centerSectSpin, QOverload<int>::of(&QSpinBox::valueChanged),
@@ -1059,7 +1059,7 @@ public:
         int end = (start + span - 1) % nvals;
         area->xStart = start;
         area->xEnd = end;
-        plot->update();
+        schedulePlotUpdate();
         updateCenterSectSpin();
       });
       updateCenterSectSpin();
@@ -1078,7 +1078,7 @@ public:
   {
     updateStats();
     updateCenterSectSpin();
-    plot->update();
+    schedulePlotUpdate();
   }
 
   void updateCenterSectSpin()
@@ -1116,6 +1116,18 @@ public:
   }
 
 private:
+  void schedulePlotUpdate()
+  {
+    if (plotUpdatePending)
+      return;
+    plotUpdatePending = true;
+    QTimer::singleShot(0, this, [this]()
+    {
+      plotUpdatePending = false;
+      plot->update();
+    });
+  }
+
   void updateStats()
   {
     for (int i = 0; i < arrayPtrs.size() && i < stats.size(); ++i) {
@@ -1150,6 +1162,7 @@ private:
   QSpinBox *intervalSpin;
   QSpinBox *centerSectSpin;
   QVector<StatLabels> stats;
+  bool plotUpdatePending = false;
 };
 
 static void updateZoomCenter()
