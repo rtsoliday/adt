@@ -162,6 +162,17 @@ struct LoadMenuInfo
   QList<LoadItem> items;
 };
 
+static QRect makePlotRect(int w, int h, int headerHeight = 0)
+{
+  return QRect(0, headerHeight, w - 1, h - headerHeight - 1);
+}
+
+static int wrapIndex(int idx, int n)
+{
+  idx %= n;
+  return idx < 0 ? idx + n : idx;
+}
+
 static void freeSddsStrings(int n, char **p)
 {
   if (!p)
@@ -362,10 +373,7 @@ protected:
       pmap.fillRect(pixmap.rect(), Qt::white);
     area->tempclear = false;
 
-    int w = pixmap.width();
-    int h = pixmap.height();
-    int headerHeight = 0;
-    QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
+    QRect plotRect = makePlotRect(pixmap.width(), pixmap.height());
 
     pmap.setPen(Qt::black);
     pmap.drawRect(plotRect);
@@ -414,12 +422,8 @@ protected:
           continue;
         if (area == zoomAreaPtr) {
           int nvals = arr->nvals;
-          int start = area->xStart % nvals;
-          if (start < 0)
-            start += nvals;
-          int end = area->xEnd % nvals;
-          if (end < 0)
-            end += nvals;
+          int start = wrapIndex(area->xStart, nvals);
+          int end = wrapIndex(area->xEnd, nvals);
           int count = (end >= start) ?
             (end - start + 1) : (nvals - start + end + 1);
           if (count < 1)
@@ -532,12 +536,8 @@ protected:
         pmap.setPen(clr);
         if (area == zoomAreaPtr) {
           int nvals = arr->nvals;
-          int start = area->xStart % nvals;
-          if (start < 0)
-            start += nvals;
-          int end = area->xEnd % nvals;
-          if (end < 0)
-            end += nvals;
+          int start = wrapIndex(area->xStart, nvals);
+          int end = wrapIndex(area->xEnd, nvals);
           int count = (end >= start) ?
             (end - start + 1) : (nvals - start + end + 1);
           if (count < 1)
@@ -625,12 +625,8 @@ protected:
       pmap.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
       int bottom = plotRect.bottom();
       int nvals = arrayPtrs[0]->nvals;
-      int start = area->xStart % nvals;
-      if (start < 0)
-        start += nvals;
-      int end = area->xEnd % nvals;
-      if (end < 0)
-        end += nvals;
+      int start = wrapIndex(area->xStart, nvals);
+      int end = wrapIndex(area->xEnd, nvals);
       double smin = arrayPtrs[0]->s[start];
       double smax = arrayPtrs[0]->s[end] + (end < start ? stotal : 0.0);
       double range = smax - smin;
@@ -686,10 +682,7 @@ protected:
   void mousePressEvent(QMouseEvent *event) override
   {
     if (event->button() == Qt::LeftButton) {
-      int w = width();
-      int h = height();
-      int headerHeight = 0;
-      QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
+      QRect plotRect = makePlotRect(width(), height());
       if (!plotRect.contains(event->pos()) || arrayPtrs.isEmpty()) {
         QWidget::mousePressEvent(event);
         return;
@@ -701,12 +694,8 @@ protected:
       }
       int nmid = 0;
       if (this == zoomPlot) {
-        int start = area->xStart % nvals;
-        if (start < 0)
-          start += nvals;
-        int end = area->xEnd % nvals;
-        if (end < 0)
-          end += nvals;
+        int start = wrapIndex(area->xStart, nvals);
+        int end = wrapIndex(area->xEnd, nvals);
         int count = (end >= start) ?
           (end - start + 1) : (nvals - start + end + 1);
         double smin = arrayPtrs[0]->s[start];
@@ -738,11 +727,7 @@ protected:
       for (auto arr : arrayPtrs) {
         info += arr->heading + "\n";
         for (int off = -1; off <= 1; ++off) {
-          int idx = nmid + off;
-          if (idx < 0)
-            idx += arr->nvals;
-          if (idx >= arr->nvals)
-            idx -= arr->nvals;
+          int idx = wrapIndex(nmid + off, arr->nvals);
           double val = arr->scaleFactor * arr->vals[idx];
           QString line = QString("%1%2 %3  %4\n")
             .arg(idx == nmid ? "->" : "  ")
@@ -762,10 +747,7 @@ protected:
       infoBox->show();
     } else if (event->button() == Qt::MiddleButton) {
       if (zoomPlot && zoomAreaPtr && this != zoomPlot && !arrayPtrs.isEmpty()) {
-        int w = width();
-        int h = height();
-        int headerHeight = 0;
-        QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
+        QRect plotRect = makePlotRect(width(), height());
         if (!plotRect.contains(event->pos())) {
           QWidget::mousePressEvent(event);
           return;
@@ -785,11 +767,8 @@ protected:
         if (span < 1)
           span = 1;
         int half = span / 2;
-        int start = idx - half;
-        start %= nvals;
-        if (start < 0)
-          start += nvals;
-        int end = (start + span - 1) % nvals;
+        int start = wrapIndex(idx - half, nvals);
+        int end = wrapIndex(start + span - 1, nvals);
         zoomAreaPtr->xStart = start;
         zoomAreaPtr->xEnd = end;
         zoomPlot->update();
@@ -805,11 +784,7 @@ protected:
   void mouseReleaseEvent(QMouseEvent *event) override
   {
     if (event->button() == Qt::LeftButton && infoBox) {
-      int w = width();
-      int h = height();
-      int headerHeight = 0;
-      QRect plotRect(0, headerHeight, w - 1, h - headerHeight - 1);
-      if (plotRect.contains(event->pos()))
+      if (makePlotRect(width(), height()).contains(event->pos()))
         infoBox->close();
       else
         QWidget::mouseReleaseEvent(event);
@@ -993,12 +968,9 @@ public:
         int oldSpan = (area->xEnd >= area->xStart) ?
           (area->xEnd - area->xStart + 1) :
           (nvals - area->xStart + area->xEnd + 1);
-        int center = (area->xStart + oldSpan / 2) % nvals;
-        int start = center - span / 2;
-        start %= nvals;
-        if (start < 0)
-          start += nvals;
-        int end = (start + span - 1) % nvals;
+        int center = wrapIndex(area->xStart + oldSpan / 2, nvals);
+        int start = wrapIndex(center - span / 2, nvals);
+        int end = wrapIndex(start + span - 1, nvals);
         area->xStart = start;
         area->xEnd = end;
         schedulePlotUpdate();
@@ -1029,11 +1001,8 @@ public:
         int span = (area->xEnd >= area->xStart) ?
           (area->xEnd - area->xStart + 1) :
           (nvals - area->xStart + area->xEnd + 1);
-        int start = center - span / 2;
-        start %= nvals;
-        if (start < 0)
-          start += nvals;
-        int end = (start + span - 1) % nvals;
+        int start = wrapIndex(center - span / 2, nvals);
+        int end = wrapIndex(start + span - 1, nvals);
         area->xStart = start;
         area->xEnd = end;
         schedulePlotUpdate();
