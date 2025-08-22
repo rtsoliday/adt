@@ -1237,8 +1237,8 @@ public:
     });
     if (!startupPv.isEmpty()) {
       QString file = startupPv;
-      if (QFileInfo(file).isRelative())
-        file = QDir(pvDir).filePath(file);
+      //if (QFileInfo(file).isRelative())
+      //file = QDir(pvDir).filePath(file);
       loadPvFile(file);
     }
     QAction *readRefAct = fileMenu->addAction("Read Reference");
