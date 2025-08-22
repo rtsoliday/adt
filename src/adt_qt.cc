@@ -90,6 +90,8 @@ static bool autoclear = true;
 static bool showmaxmin = true;
 static bool fillmaxmin = true;
 static int diffSet = -1;
+static int displaySet = -1;
+static QColor displayColor("Grey40");
 static bool statMode = false;
 static bool refOn = true;
 static bool referenceLoaded = false;
@@ -538,104 +540,117 @@ protected:
       return;
     }
 
-    for (auto arr : arrayPtrs) {
-      if (arr->nvals < 1)
-        continue;
-      if (area == zoomAreaPtr) {
-        int nvals = arr->nvals;
-        int start = area->xStart % nvals;
-        if (start < 0)
-          start += nvals;
-        int end = area->xEnd % nvals;
-        if (end < 0)
-          end += nvals;
-        int count = (end >= start) ?
-          (end - start + 1) : (nvals - start + end + 1);
-        if (count < 1)
-          continue;
-        double smin = arr->s[start];
-        double smax = arr->s[end] + (end < start ? stotal : 0.0);
-        double range = smax - smin;
-        auto xpos = [&](int idx) {
-          double sval = arr->s[idx];
-          if (idx < start)
-            sval += stotal;
-          double frac = (sval - smin) / range;
-          return plotRect.left() + frac * plotRect.width();
-        };
-        if (bars) {
-          pmap.setPen(arr->color);
-          for (int i = 0; i < count; ++i) {
-            int idx = (start + i) % nvals;
-            int x = static_cast<int>(xpos(idx));
-            int y = mapY(diffVal(arr, arr->vals, idx));
-            pmap.drawLine(x, y0, x, y);
+      auto drawArray = [&](ArrayData *arr, const QVector<double> &vec,
+        const QColor &clr) {
+        if (arr->nvals < 1 || vec.size() != arr->nvals)
+          return;
+        if (area == zoomAreaPtr) {
+          int nvals = arr->nvals;
+          int start = area->xStart % nvals;
+          if (start < 0)
+            start += nvals;
+          int end = area->xEnd % nvals;
+          if (end < 0)
+            end += nvals;
+          int count = (end >= start) ?
+            (end - start + 1) : (nvals - start + end + 1);
+          if (count < 1)
+            return;
+          double smin = arr->s[start];
+          double smax = arr->s[end] + (end < start ? stotal : 0.0);
+          double range = smax - smin;
+          auto xpos = [&](int idx) {
+            double sval = arr->s[idx];
+            if (idx < start)
+              sval += stotal;
+            double frac = (sval - smin) / range;
+            return plotRect.left() + frac * plotRect.width();
+          };
+          if (bars) {
+            pmap.setPen(clr);
+            for (int i = 0; i < count; ++i) {
+              int idx = (start + i) % nvals;
+              int x = static_cast<int>(xpos(idx));
+              int y = mapY(diffVal(arr, vec, idx));
+              pmap.drawLine(x, y0, x, y);
+            }
+          } else if (lines) {
+            pmap.setPen(clr);
+            QPainterPath path;
+            path.moveTo(xpos(start), mapY(diffVal(arr, vec, start)));
+            for (int i = 1; i < count; ++i) {
+              int idx = (start + i) % nvals;
+              path.lineTo(xpos(idx), mapY(diffVal(arr, vec, idx)));
+            }
+            pmap.drawPath(path);
           }
-        } else if (lines) {
-          pmap.setPen(arr->color);
-          QPainterPath path;
-          path.moveTo(xpos(start), mapY(diffVal(arr, arr->vals, start)));
-          for (int i = 1; i < count; ++i) {
-            int idx = (start + i) % nvals;
-            path.lineTo(xpos(idx), mapY(diffVal(arr, arr->vals, idx)));
+          if (markers) {
+            pmap.setPen(clr);
+            pmap.setBrush(clr);
+            for (int i = 0; i < count; ++i) {
+              int idx = (start + i) % nvals;
+              int x = static_cast<int>(xpos(idx));
+              int y = mapY(diffVal(arr, vec, idx));
+              pmap.drawRect(x - 1, y - 1, 3, 3);
+            }
+            pmap.setBrush(Qt::NoBrush);
           }
-          pmap.drawPath(path);
+        } else {
+          int start = area->xStart;
+          int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
+          if (start < 0)
+            start = 0;
+          if (end > arr->nvals)
+            end = arr->nvals;
+          int count = end - start;
+          if (count < 1)
+            return;
+          double xstep = plotRect.width() /
+            static_cast<double>(count);
+          double xstart = plotRect.left() + xstep / 2.0; // add half-bin margin
+          if (bars) {
+            pmap.setPen(clr);
+            for (int i = start; i < end; ++i) {
+              int x = static_cast<int>(xstart + (i - start) * xstep);
+              int y = mapY(diffVal(arr, vec, i));
+              pmap.drawLine(x, y0, x, y);
+            }
+          } else if (lines) {
+            pmap.setPen(clr);
+            QPainterPath path;
+            path.moveTo(xstart, mapY(diffVal(arr, vec, start)));
+            for (int i = start + 1; i < end; ++i)
+              path.lineTo(xstart + (i - start) * xstep,
+                mapY(diffVal(arr, vec, i)));
+            pmap.drawPath(path);
+          }
+          if (markers) {
+            pmap.setPen(clr);
+            pmap.setBrush(clr);
+            for (int i = start; i < end; ++i) {
+              int x = static_cast<int>(xstart + (i - start) * xstep);
+              int y = mapY(diffVal(arr, vec, i));
+              pmap.drawRect(x - 1, y - 1, 3, 3);
+            }
+            pmap.setBrush(Qt::NoBrush);
+          }
         }
-        if (markers) {
-          pmap.setPen(arr->color);
-          pmap.setBrush(arr->color);
-          for (int i = 0; i < count; ++i) {
-            int idx = (start + i) % nvals;
-            int x = static_cast<int>(xpos(idx));
-            int y = mapY(diffVal(arr, arr->vals, idx));
-            pmap.drawRect(x - 1, y - 1, 3, 3);
-          }
-          pmap.setBrush(Qt::NoBrush);
-        }
-      } else {
-        int start = area->xStart;
-        int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
-        if (start < 0)
-          start = 0;
-        if (end > arr->nvals)
-          end = arr->nvals;
-        int count = end - start;
-        if (count < 1)
-          continue;
-        double xstep = plotRect.width() /
-          static_cast<double>(count);
-        double xstart = plotRect.left() + xstep / 2.0; // add half-bin margin
-        if (bars) {
-          pmap.setPen(arr->color);
-          for (int i = start; i < end; ++i) {
-            int x = static_cast<int>(xstart + (i - start) * xstep);
-            int y = mapY(diffVal(arr, arr->vals, i));
-            pmap.drawLine(x, y0, x, y);
-          }
-        } else if (lines) {
-          pmap.setPen(arr->color);
-          QPainterPath path;
-          path.moveTo(xstart, mapY(diffVal(arr, arr->vals, start)));
-          for (int i = start + 1; i < end; ++i)
-            path.lineTo(xstart + (i - start) * xstep,
-              mapY(diffVal(arr, arr->vals, i)));
-          pmap.drawPath(path);
-        }
-        if (markers) {
-          pmap.setPen(arr->color);
-          pmap.setBrush(arr->color);
-          for (int i = start; i < end; ++i) {
-            int x = static_cast<int>(xstart + (i - start) * xstep);
-            int y = mapY(diffVal(arr, arr->vals, i));
-            pmap.drawRect(x - 1, y - 1, 3, 3);
-          }
-          pmap.setBrush(Qt::NoBrush);
+      };
+
+      if (displaySet >= 0) {
+        for (auto arr : arrayPtrs) {
+          QColor clr = displayColor;
+          if (clr == arr->color)
+            clr = Qt::green;
+          drawArray(arr, arr->saveVals[displaySet], clr);
         }
       }
-    }
 
-    if (this == zoomPlot && nsect > 0 && stotal > 0.0 && !arrayPtrs.isEmpty() &&
-        arrayPtrs[0]->nvals > 0) {
+      for (auto arr : arrayPtrs)
+        drawArray(arr, arr->vals, arr->color);
+
+      if (this == zoomPlot && nsect > 0 && stotal > 0.0 && !arrayPtrs.isEmpty() &&
+          arrayPtrs[0]->nvals > 0) {
       pmap.setPen(Qt::black);
       pmap.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
       int bottom = plotRect.bottom();
@@ -1236,9 +1251,12 @@ public:
       connect(act, &QAction::triggered, this, [this, i]() { storeSet(i); });
     }
     QMenu *displayMenu = optionsMenu->addMenu("Display");
-    displayMenu->addAction("Off");
-    for (int i = 1; i <= NSAVE; ++i)
-      displayMenu->addAction(QString::number(i));
+    QAction *displayOffAct = displayMenu->addAction("Off");
+    connect(displayOffAct, &QAction::triggered, this, [this]() { displaySet(0); });
+    for (int i = 1; i <= NSAVE; ++i) {
+      QAction *act = displayMenu->addAction(QString::number(i));
+      connect(act, &QAction::triggered, this, [this, i]() { displaySet(i); });
+    }
     QMenu *diffMenu = optionsMenu->addMenu("Difference");
     QAction *diffOffAct = diffMenu->addAction("Off");
     connect(diffOffAct, &QAction::triggered, this, [this]() { diffSet(0); });
@@ -1449,6 +1467,27 @@ public:
     tbuf[24] = '\0';
     saveTime[idx] = QString::fromUtf8(tbuf);
     saveFilename[idx].clear();
+    resetGraph();
+  }
+
+  void displaySet(int n)
+  {
+    if (n >= 1 && n <= NSAVE) {
+      if (arrays.isEmpty()) {
+        QMessageBox::warning(this, "ADT", "There are no PV's defined");
+        return;
+      }
+      int idx = n - 1;
+      for (const ArrayData &arr : arrays) {
+        if (arr.saveVals[idx].size() != arr.nvals) {
+          QMessageBox::warning(this, "ADT", "Data is not defined");
+          return;
+        }
+      }
+      ::displaySet = idx;
+    } else {
+      ::displaySet = -1;
+    }
     resetGraph();
   }
 
