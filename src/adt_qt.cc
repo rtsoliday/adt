@@ -91,6 +91,10 @@ static bool fillmaxmin = true;
 
 static int nsect = 0;
 static double stotal = 0.0;
+static QVector<QString> latNames;
+static QVector<double> latS;
+static QVector<double> latLen;
+static QVector<short> latHeight;
 
 struct AreaData
 {
@@ -112,6 +116,7 @@ struct ArrayData
   int nvals = 0;
   QVector<QString> names;
   QVector<double> vals;
+  QVector<double> s;
   QVector<double> minVals;
   QVector<double> maxVals;
   QVector<bool> conn;
@@ -227,6 +232,10 @@ static QList<LoadMenuInfo> readInitFile(const QString &filename,
 static bool readLatticeFile(const QString &filename, int &nsectOut,
   double &stotalOut)
 {
+  latNames.clear();
+  latS.clear();
+  latLen.clear();
+  latHeight.clear();
   SDDS_TABLE table;
   QByteArray fname = filename.toUtf8();
   if (!SDDS_InitializeInput(&table, fname.data()))
@@ -243,7 +252,33 @@ static bool readLatticeFile(const QString &filename, int &nsectOut,
         SDDS_GetParameterAsDouble(&table, const_cast<char *>("Stotal"), &st)) {
       nsectOut = static_cast<int>(ns);
       stotalOut = st;
-      ok = true;
+      int rows = SDDS_CountRowsOfInterest(&table);
+      char **names = (char **)SDDS_GetColumn(&table,
+        const_cast<char *>("Name"));
+      double *scol = (double *)SDDS_GetColumn(&table,
+        const_cast<char *>("S"));
+      double *len = (double *)SDDS_GetColumn(&table,
+        const_cast<char *>("Length"));
+      short *height = (short *)SDDS_GetColumn(&table,
+        const_cast<char *>("SymbolHeight"));
+      if (names && scol && len && height) {
+        for (int i = 0; i < rows; ++i) {
+          latNames.append(names[i]);
+          latS.append(scol[i]);
+          latLen.append(len[i]);
+          latHeight.append(height[i]);
+          SDDS_Free(names[i]);
+        }
+        ok = true;
+      }
+      if (names)
+        SDDS_Free(names);
+      if (scol)
+        SDDS_Free(scol);
+      if (len)
+        SDDS_Free(len);
+      if (height)
+        SDDS_Free(height);
     }
   }
   if (type)
@@ -375,37 +410,44 @@ protected:
             (end - start + 1) : (nvals - start + end + 1);
           if (count < 1)
             continue;
-          double xstep = plotRect.width() /
-            static_cast<double>(count);
-          double xstart = plotRect.left() + xstep / 2.0;
+          double smin = arr->s[start];
+          double smax = arr->s[end] + (end < start ? stotal : 0.0);
+          double range = smax - smin;
+          auto xpos = [&](int idx) {
+            double sval = arr->s[idx];
+            if (idx < start)
+              sval += stotal;
+            double frac = (sval - smin) / range;
+            return plotRect.left() + frac * plotRect.width();
+          };
           if (fillmaxmin) {
             QPainterPath path;
-            path.moveTo(xstart, mapY(arr->minVals[start]));
+            path.moveTo(xpos(start), mapY(arr->minVals[start]));
             for (int i = 1; i < count; ++i) {
               int idx = (start + i) % nvals;
-              path.lineTo(xstart + i * xstep, mapY(arr->minVals[idx]));
+              path.lineTo(xpos(idx), mapY(arr->minVals[idx]));
             }
             for (int i = count - 1; i >= 0; --i) {
               int idx = (start + i) % nvals;
-              path.lineTo(xstart + i * xstep, mapY(arr->maxVals[idx]));
+              path.lineTo(xpos(idx), mapY(arr->maxVals[idx]));
             }
             path.closeSubpath();
             pmap.fillPath(path, Qt::lightGray);
           } else {
             pmap.setPen(arr->color);
             QPainterPath pathMin;
-            pathMin.moveTo(xstart, mapY(arr->minVals[start]));
+            pathMin.moveTo(xpos(start), mapY(arr->minVals[start]));
             for (int i = 1; i < count; ++i) {
               int idx = (start + i) % nvals;
-              pathMin.lineTo(xstart + i * xstep,
+              pathMin.lineTo(xpos(idx),
                 mapY(arr->minVals[idx]));
             }
             pmap.drawPath(pathMin);
             QPainterPath pathMax;
-            pathMax.moveTo(xstart, mapY(arr->maxVals[start]));
+            pathMax.moveTo(xpos(start), mapY(arr->maxVals[start]));
             for (int i = 1; i < count; ++i) {
               int idx = (start + i) % nvals;
-              pathMax.lineTo(xstart + i * xstep,
+              pathMax.lineTo(xpos(idx),
                 mapY(arr->maxVals[idx]));
             }
             pmap.drawPath(pathMax);
@@ -480,24 +522,31 @@ protected:
           (end - start + 1) : (nvals - start + end + 1);
         if (count < 1)
           continue;
-        double xstep = plotRect.width() /
-          static_cast<double>(count);
-        double xstart = plotRect.left() + xstep / 2.0; // add half-bin margin
+        double smin = arr->s[start];
+        double smax = arr->s[end] + (end < start ? stotal : 0.0);
+        double range = smax - smin;
+        auto xpos = [&](int idx) {
+          double sval = arr->s[idx];
+          if (idx < start)
+            sval += stotal;
+          double frac = (sval - smin) / range;
+          return plotRect.left() + frac * plotRect.width();
+        };
         if (bars) {
           pmap.setPen(arr->color);
           for (int i = 0; i < count; ++i) {
             int idx = (start + i) % nvals;
-            int x = static_cast<int>(xstart + i * xstep);
+            int x = static_cast<int>(xpos(idx));
             int y = mapY(arr->vals[idx]);
             pmap.drawLine(x, y0, x, y);
           }
         } else if (lines) {
           pmap.setPen(arr->color);
           QPainterPath path;
-          path.moveTo(xstart, mapY(arr->vals[start]));
+          path.moveTo(xpos(start), mapY(arr->vals[start]));
           for (int i = 1; i < count; ++i) {
             int idx = (start + i) % nvals;
-            path.lineTo(xstart + i * xstep, mapY(arr->vals[idx]));
+            path.lineTo(xpos(idx), mapY(arr->vals[idx]));
           }
           pmap.drawPath(path);
         }
@@ -506,7 +555,7 @@ protected:
           pmap.setBrush(arr->color);
           for (int i = 0; i < count; ++i) {
             int idx = (start + i) % nvals;
-            int x = static_cast<int>(xstart + i * xstep);
+            int x = static_cast<int>(xpos(idx));
             int y = mapY(arr->vals[idx]);
             pmap.drawRect(x - 1, y - 1, 3, 3);
           }
@@ -565,10 +614,37 @@ protected:
       int end = area->xEnd % nvals;
       if (end < 0)
         end += nvals;
-      int count = (end >= start) ?
-        (end - start + 1) : (nvals - start + end + 1);
-      double smin = (start / static_cast<double>(nvals)) * stotal;
-      double smax = (start + count) / static_cast<double>(nvals) * stotal;
+      double smin = arrayPtrs[0]->s[start];
+      double smax = arrayPtrs[0]->s[end] + (end < start ? stotal : 0.0);
+      double range = smax - smin;
+      auto xfroms = [&](double sval) {
+        double s = sval;
+        if (s < smin)
+          s += stotal;
+        if (s > smax)
+          s -= stotal;
+        return plotRect.left() + ((s - smin) / range) * plotRect.width();
+      };
+      int bunit = static_cast<int>(-0.015 * plotRect.height());
+      for (int i = 0; i < latS.size(); ++i) {
+        double s = latS[i];
+        double sadd = s;
+        if (sadd < smin)
+          sadd += stotal;
+        if (sadd > smax)
+          sadd -= stotal;
+        if (sadd >= smin && sadd <= smax) {
+          int x1 = static_cast<int>(xfroms(s));
+          int unit = latHeight[i] * bunit;
+          pmap.drawLine(x1, y0, x1, y0 + unit);
+          if (latLen[i] > 0) {
+            double s2 = s + latLen[i];
+            int x2 = static_cast<int>(xfroms(s2));
+            pmap.drawLine(x1, y0 + unit, x2, y0 + unit);
+            pmap.drawLine(x2, y0 + unit, x2, y0);
+          }
+        }
+      }
       for (int i = 0; i < nsect; ++i) {
         double snumber = ((i + 0.5) * stotal) / nsect;
         if (snumber < smin)
@@ -576,7 +652,7 @@ protected:
         if (snumber > smax)
           snumber -= stotal;
         if (snumber > smin && snumber < smax) {
-          double frac = (snumber - smin) / (smax - smin);
+          double frac = (snumber - smin) / range;
           int x = static_cast<int>(plotRect.left() + frac * plotRect.width());
           pmap.drawLine(x, bottom, x, bottom - 2);
           QString label = QString::number(i + 1);
@@ -606,23 +682,57 @@ protected:
         QWidget::mousePressEvent(event);
         return;
       }
-      double xstep = nvals > 1 ? plotRect.width() /
-        static_cast<double>(nvals - 1) : 0.0;
-      int nmid = static_cast<int>((event->pos().x() - plotRect.left()) /
-        xstep + 0.5);
+      int nmid = 0;
+      if (this == zoomPlot) {
+        int start = area->xStart % nvals;
+        if (start < 0)
+          start += nvals;
+        int end = area->xEnd % nvals;
+        if (end < 0)
+          end += nvals;
+        int count = (end >= start) ?
+          (end - start + 1) : (nvals - start + end + 1);
+        double smin = arrayPtrs[0]->s[start];
+        double smax = arrayPtrs[0]->s[end] + (end < start ? stotal : 0.0);
+        double range = smax - smin;
+        double frac = (event->pos().x() - plotRect.left()) /
+          static_cast<double>(plotRect.width());
+        double sval = smin + frac * range;
+        double best = std::fabs(arrayPtrs[0]->s[start] - sval);
+        nmid = start;
+        for (int i = 1; i < count; ++i) {
+          int idx = (start + i) % nvals;
+          double s = arrayPtrs[0]->s[idx];
+          if (idx < start)
+            s += stotal;
+          double diff = std::fabs(s - sval);
+          if (diff < best) {
+            best = diff;
+            nmid = idx;
+          }
+        }
+      } else {
+        double xstep = nvals > 1 ? plotRect.width() /
+          static_cast<double>(nvals - 1) : 0.0;
+        nmid = static_cast<int>((event->pos().x() - plotRect.left()) /
+          xstep + 0.5);
+      }
       QString info;
       for (auto arr : arrayPtrs) {
         info += arr->heading + "\n";
-        for (int idx = nmid - 1; idx <= nmid + 1; ++idx) {
-          if (idx >= 0 && idx < arr->nvals) {
-            double val = arr->scaleFactor * arr->vals[idx];
-            QString line = QString("%1%2 %3  %4\n")
-              .arg(idx == nmid ? "->" : "  ")
-              .arg(idx + 1)
-              .arg(arr->names[idx])
-              .arg(val, 7, 'f', 3);
-            info += line;
-          }
+        for (int off = -1; off <= 1; ++off) {
+          int idx = nmid + off;
+          if (idx < 0)
+            idx += arr->nvals;
+          if (idx >= arr->nvals)
+            idx -= arr->nvals;
+          double val = arr->scaleFactor * arr->vals[idx];
+          QString line = QString("%1%2 %3  %4\n")
+            .arg(idx == nmid ? "->" : "  ")
+            .arg(idx + 1)
+            .arg(arr->names[idx])
+            .arg(val, 7, 'f', 3);
+          info += line;
         }
       }
       if (infoBox)
@@ -1473,6 +1583,10 @@ private:
         } else {
           nsect = 0;
           stotal = 0.0;
+          latNames.clear();
+          latS.clear();
+          latLen.clear();
+          latHeight.clear();
         }
         first = false;
       }
@@ -1558,6 +1672,7 @@ private:
       arr.nvals = rows;
       arr.names.clear();
       arr.vals.fill(0.0, rows);
+      arr.s.fill(0.0, rows);
       arr.minVals.fill(LARGEVAL, rows);
       arr.maxVals.fill(-LARGEVAL, rows);
       arr.conn.fill(false, rows);
@@ -1584,6 +1699,25 @@ private:
         SDDS_Free(names[i]);
       }
       SDDS_Free(names);
+      if (!latS.isEmpty()) {
+        int jstart = 0;
+        for (int i = 0; i < rows; ++i) {
+          bool found = false;
+          for (int j = 0; j < latNames.size(); ++j) {
+            int jj = (jstart + j) % latNames.size();
+            if (arr.names[i].contains(latNames[jj])) {
+              arr.s[i] = latS[jj];
+              jstart = jj + 1;
+              found = true;
+              break;
+            }
+          }
+          if (!found)
+            QMessageBox::warning(this, "ADT",
+              QString("Did not find an s value for %1 in array %2")
+              .arg(arr.names[i]).arg(iarray + 1));
+        }
+      }
     }
 
     SDDS_Terminate(&table);
@@ -1622,7 +1756,7 @@ private:
       arr.runMax = 0.0;
     }
 
-    nsymbols = channels.size();
+    nsymbols = latNames.size();
 
     QWidget *central = new QWidget;
     QVBoxLayout *layout = new QVBoxLayout(central);
