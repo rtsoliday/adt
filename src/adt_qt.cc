@@ -1464,6 +1464,20 @@ public:
         .arg(unameStr);
       QMessageBox::information(this, "ADT Version", msg);
     });
+
+    QMenu *topMenus[] = { fileMenu, optionsMenu, viewMenu, clearMenu, helpMenu };
+    for (QMenu *m : topMenus) {
+      connect(m, &QMenu::aboutToShow, this, [this]()
+      {
+        if (pollTimer)
+          pollTimer->stop();
+      });
+      connect(m, &QMenu::aboutToHide, this, [this]()
+      {
+        if (pollTimer)
+          pollTimer->start(timeInterval);
+      });
+    }
   }
 
   ~MainWindow() override
