@@ -56,6 +56,7 @@
 #include <SDDS.h>
 #include <QDir>
 #include <cadef.h>
+#include <iostream>
 
 #define INITFILENAME "adtrc"
 
@@ -87,6 +88,9 @@ static bool grid = true;
 static bool autoclear = true;
 static bool showmaxmin = true;
 static bool fillmaxmin = true;
+
+static int nsect = 0;
+static double stotal = 0.0;
 
 struct AreaData
 {
@@ -210,6 +214,42 @@ static QList<LoadMenuInfo> readInitFile(const QString &filename,
   }
   SDDS_Terminate(&table);
   return menus;
+}
+
+/**
+ * @brief Read lattice file and extract sector information.
+ *
+ * @param filename Path to the lattice file.
+ * @param nsectOut Returns the number of sectors.
+ * @param stotalOut Returns the total lattice length.
+ * @return true on success, false on failure.
+ */
+static bool readLatticeFile(const QString &filename, int &nsectOut,
+  double &stotalOut)
+{
+  SDDS_TABLE table;
+  QByteArray fname = filename.toUtf8();
+  if (!SDDS_InitializeInput(&table, fname.data()))
+    return false;
+  if (SDDS_ReadTable(&table) != 1)
+    return false;
+  bool ok = false;
+  char *type = NULL;
+  type = SDDS_GetParameterAsString(&table, const_cast<char *>("ADTFileType"), NULL);
+  if (type && !strcmp(type, "ADTLATTICE")) {
+    int32_t ns;
+    double st;
+    if (SDDS_GetParameterAsLong(&table, const_cast<char *>("Nsectors"), &ns) &&
+        SDDS_GetParameterAsDouble(&table, const_cast<char *>("Stotal"), &st)) {
+      nsectOut = static_cast<int>(ns);
+      stotalOut = st;
+      ok = true;
+    }
+  }
+  if (type)
+    SDDS_Free(type);
+  SDDS_Terminate(&table);
+  return ok;
 }
 
 class LogoWidget : public QWidget
@@ -513,17 +553,36 @@ protected:
       }
     }
 
-    if (this == zoomPlot) {
+    if (this == zoomPlot && nsect > 0 && stotal > 0.0 && !arrayPtrs.isEmpty() &&
+        arrayPtrs[0]->nvals > 0) {
       pmap.setPen(Qt::black);
       pmap.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
-      double xstep = plotRect.width() / 10.0;
       int bottom = plotRect.bottom();
-      for (int i = 0; i <= 10; ++i) {
-        int x = static_cast<int>(plotRect.left() + i * xstep);
-        pmap.drawLine(x, bottom, x, bottom - 2);
-        QString label = QString::number(i);
-        QRect tr(x - 10, bottom - 15, 20, 16);
-        pmap.drawText(tr, Qt::AlignTop | Qt::AlignHCenter, label);
+      int nvals = arrayPtrs[0]->nvals;
+      int start = area->xStart % nvals;
+      if (start < 0)
+        start += nvals;
+      int end = area->xEnd % nvals;
+      if (end < 0)
+        end += nvals;
+      int count = (end >= start) ?
+        (end - start + 1) : (nvals - start + end + 1);
+      double smin = (start / static_cast<double>(nvals)) * stotal;
+      double smax = (start + count) / static_cast<double>(nvals) * stotal;
+      for (int i = 0; i < nsect; ++i) {
+        double snumber = ((i + 0.5) * stotal) / nsect;
+        if (snumber < smin)
+          snumber += stotal;
+        if (snumber > smax)
+          snumber -= stotal;
+        if (snumber > smin && snumber < smax) {
+          double frac = (snumber - smin) / (smax - smin);
+          int x = static_cast<int>(plotRect.left() + frac * plotRect.width());
+          pmap.drawLine(x, bottom, x, bottom - 2);
+          QString label = QString::number(i + 1);
+          QRect tr(x - 10, bottom - 15, 20, 16);
+          pmap.drawText(tr, Qt::AlignTop | Qt::AlignHCenter, label);
+        }
       }
     }
 
@@ -824,7 +883,7 @@ public:
     connect(pollTimer, &QTimer::timeout, this, [this]() { pollPvUpdate(); });
 
     QMenu *fileMenu = menuBar()->addMenu("File");
-    QString adtHome = homeOverride.isEmpty() ?
+    adtHome = homeOverride.isEmpty() ?
       qEnvironmentVariable("ADTHOME", ".") : homeOverride;
     QString initFile;
     if (homeSpecified) {
@@ -1061,6 +1120,7 @@ public:
   }
 
 private:
+  QString adtHome;
   QString customDirectory;
   QString pvFilename;
   QString latFilename;
@@ -1398,6 +1458,22 @@ private:
         if (SDDS_GetParameterAsLong(&table,
             const_cast<char *>("ADTTimeInterval"), &templong))
           timeInterval = static_cast<int>(templong);
+        char *latfile = NULL;
+        if (SDDS_GetParameter(&table, const_cast<char *>("ADTLatticeFile"),
+            &latfile) && latfile) {
+          QString lf = latfile;
+          if (QFileInfo(lf).isRelative())
+            lf = QDir(adtHome).filePath(lf);
+          latFilename = lf;
+          if (!readLatticeFile(lf, nsect, stotal)) {
+            nsect = 0;
+            stotal = 0.0;
+          }
+          SDDS_Free(latfile);
+        } else {
+          nsect = 0;
+          stotal = 0.0;
+        }
         first = false;
       }
 
