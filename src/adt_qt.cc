@@ -91,6 +91,8 @@ static bool showmaxmin = true;
 static bool fillmaxmin = true;
 static int diffSet = -1;
 static bool statMode = false;
+static bool refOn = true;
+static bool referenceLoaded = false;
 static double nstat = 0.0;
 static double nstatTime = 0.0;
 
@@ -140,6 +142,7 @@ struct ArrayData
   AreaData *area = nullptr;
   QColor color;
   QVector<double> saveVals[NSAVE];
+  QVector<double> refVals;
 };
 
 class PlotWidget;
@@ -161,6 +164,15 @@ struct LoadMenuInfo
   QString title;
   QList<LoadItem> items;
 };
+
+static void freeSddsStrings(int n, char **p)
+{
+  if (!p)
+    return;
+  for (int i = 0; i < n; ++i)
+    SDDS_Free(p[i]);
+  SDDS_Free(p);
+}
 
 static QList<LoadMenuInfo> readInitFile(const QString &filename,
   const QString &adtHome, QString &pvDirectory, QString &customDirectory)
@@ -394,6 +406,8 @@ protected:
 
     auto diffVal = [&](ArrayData *arr, const QVector<double> &vec, int idx) {
       double v = vec[idx];
+      if (referenceLoaded && refOn && arr->refVals.size() == arr->nvals)
+        v -= arr->refVals[idx];
       if (diffSet >= 0 && arr->saveVals[diffSet].size() == arr->nvals)
         v -= arr->saveVals[diffSet][idx];
       return v;
@@ -1188,7 +1202,8 @@ public:
         file = QDir(pvDir).filePath(file);
       loadPvFile(file);
     }
-    fileMenu->addAction("Read Reference");
+    QAction *readRefAct = fileMenu->addAction("Read Reference");
+    connect(readRefAct, &QAction::triggered, this, [this]() { readReference(); });
     QMenu *readSnapMenu = fileMenu->addMenu("Read Snapshot");
     for (int i = 1; i <= NSAVE; ++i)
       readSnapMenu->addAction(QString::number(i));
@@ -1229,8 +1244,14 @@ public:
     checkMenu->addAction("Off");
     checkMenu->addAction("Check InValid");
     checkMenu->addAction("Check All");
-    QAction *refAct = optionsMenu->addAction("Reference Enabled");
+    refAct = optionsMenu->addAction("Reference Enabled");
     refAct->setCheckable(true);
+    refAct->setChecked(refOn);
+    connect(refAct, &QAction::toggled, this, [this](bool checked)
+    {
+      refOn = checked;
+      resetGraph();
+    });
     zoomAct = optionsMenu->addAction("Zoom Enabled");
     zoomAct->setCheckable(true);
     zoomAct->setChecked(zoomOn);
@@ -1462,6 +1483,7 @@ private:
   QVector<AreaData> areas;
   QVector<AreaWidget *> areaWidgets;
   AreaWidget *zoomWidget = nullptr;
+  QAction *refAct = nullptr;
   QAction *zoomAct = nullptr;
   AreaData zoomArea;
   bool zoomOn = true;
@@ -1633,6 +1655,99 @@ private:
     return true;
   }
 
+  bool readRefFile(const QString &filename)
+  {
+    SDDS_TABLE table;
+    QByteArray fname = filename.toUtf8();
+    SDDS_ClearErrors();
+    if (!SDDS_InitializeInput(&table, fname.data())) {
+      QMessageBox::warning(this, "ADT",
+        QString("Unable to read %1").arg(filename));
+      if (SDDS_NumberOfErrors())
+        SDDS_PrintErrors(stderr, SDDS_VERBOSE_PrintErrors);
+      return false;
+    }
+    if (SDDS_CheckColumn(&table, const_cast<char *>("ControlName"), NULL,
+        SDDS_STRING, NULL) != SDDS_CHECK_OKAY ||
+        SDDS_CheckColumn(&table, const_cast<char *>("ValueString"), NULL,
+        SDDS_STRING, NULL) != SDDS_CHECK_OKAY) {
+      QMessageBox::warning(this, "ADT",
+        "Missing required columns in reference file");
+      SDDS_Terminate(&table);
+      return false;
+    }
+    for (int ia = 0; ia < arrays.size(); ++ia) {
+      if (!SDDS_ReadTable(&table)) {
+        QMessageBox::warning(this, "ADT",
+          QString("Could not get Data for array %1 in %2")
+            .arg(ia + 1).arg(filename));
+        SDDS_Terminate(&table);
+        return false;
+      }
+      if (ia == 0) {
+        char *type = nullptr;
+        if (!SDDS_GetParameter(&table, const_cast<char *>("ADTFileType"),
+            &type) || strcmp(type, SNAPID)) {
+          QMessageBox::warning(this, "ADT",
+            QString("Not a valid ADT Reference/Snapshot file: %1")
+              .arg(filename));
+          if (type)
+            SDDS_Free(type);
+          SDDS_Terminate(&table);
+          return false;
+        }
+        if (type)
+          SDDS_Free(type);
+      }
+      int nvals = SDDS_CountRowsOfInterest(&table);
+      if (nvals != arrays[ia].nvals) {
+        QMessageBox::warning(this, "ADT",
+          QString("Wrong number of items [%1] for array %2 in %3")
+            .arg(nvals).arg(ia + 1).arg(filename));
+        SDDS_Terminate(&table);
+        return false;
+      }
+      char **rawnames = (char **)SDDS_GetColumn(&table,
+        const_cast<char *>("ControlName"));
+      if (!rawnames) {
+        QMessageBox::warning(this, "ADT",
+          QString("Could not get ControlName's for array %1 in %2")
+            .arg(ia + 1).arg(filename));
+        SDDS_Terminate(&table);
+        return false;
+      }
+      char **rawvalues = (char **)SDDS_GetColumn(&table,
+        const_cast<char *>("ValueString"));
+      if (!rawvalues) {
+        QMessageBox::warning(this, "ADT",
+          QString("Could not get ValueString's for array %1 in %2")
+            .arg(ia + 1).arg(filename));
+        freeSddsStrings(nvals, rawnames);
+        SDDS_Terminate(&table);
+        return false;
+      }
+      arrays[ia].refVals.resize(arrays[ia].nvals);
+      for (int i = 0; i < nvals; ++i) {
+        if (QString(rawnames[i]) != arrays[ia].names[i]) {
+          QMessageBox::warning(this, "ADT",
+            QString("PV does not match: %1 from %2")
+              .arg(rawnames[i]).arg(filename));
+          freeSddsStrings(nvals, rawnames);
+          freeSddsStrings(nvals, rawvalues);
+          SDDS_Terminate(&table);
+          return false;
+        }
+        arrays[ia].refVals[i] = atof(rawvalues[i]);
+      }
+      freeSddsStrings(nvals, rawnames);
+      freeSddsStrings(nvals, rawvalues);
+    }
+    SDDS_Terminate(&table);
+    if (SDDS_NumberOfErrors())
+      SDDS_PrintErrors(stderr, SDDS_VERBOSE_PrintErrors);
+    return true;
+  }
+
   bool writeSnapFile(const QString &filename)
   {
     FILE *file = fopen(filename.toUtf8().constData(), "w");
@@ -1678,6 +1793,28 @@ private:
     }
     fclose(file);
     return true;
+  }
+
+  void readReference()
+  {
+    if (arrays.isEmpty()) {
+      QMessageBox::warning(this, "ADT", "There are no PV's defined");
+      return;
+    }
+    QString dir = QDir::currentPath();
+    QString fn = QFileDialog::getOpenFileName(this,
+      "Read Reference File", dir, "Snapshot Files (*.snap)");
+    if (fn.isEmpty())
+      return;
+    if (!readRefFile(fn)) {
+      QMessageBox::warning(this, "ADT",
+        "Could not read reference data\nReferencing is inactive");
+      referenceLoaded = false;
+      return;
+    }
+    referenceLoaded = true;
+    refFilename = fn;
+    resetGraph();
   }
 
   /**
@@ -1748,6 +1885,8 @@ private:
       saveTime[i].clear();
       saveFilename[i].clear();
     }
+    refFilename.clear();
+    referenceLoaded = false;
 
     if (ca_context_create(ca_disable_preemptive_callback) != ECA_NORMAL) {
       QMessageBox::warning(this, "ADT", "Unable to start Channel Access");
