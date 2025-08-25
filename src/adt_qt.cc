@@ -37,6 +37,7 @@
 #include <QPen>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QDoubleSpinBox>
 #include <QSpinBox>
 #include <QString>
@@ -156,6 +157,7 @@ static PlotWidget *zoomPlot = nullptr;
 static AreaData *zoomAreaPtr = nullptr;
 static AreaWidget *zoomAreaWidget = nullptr;
 static void updateZoomCenter();
+static void updateZoomInterval();
 static void getCallback(struct event_handler_args args);
 
 struct LoadItem
@@ -821,6 +823,64 @@ protected:
     }
   }
 
+  void wheelEvent(QWheelEvent *event) override
+  {
+    if (this != zoomPlot || !zoomAreaPtr || arrayPtrs.isEmpty()) {
+      QWidget::wheelEvent(event);
+      return;
+    }
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    QPoint pos = event->position().toPoint();
+#else
+    QPoint pos = event->pos();
+#endif
+    QRect plotRect = makePlotRect(width(), height());
+    if (!plotRect.contains(pos)) {
+      QWidget::wheelEvent(event);
+      return;
+    }
+    int nvals = arrayPtrs[0]->nvals;
+    if (nvals < 1) {
+      QWidget::wheelEvent(event);
+      return;
+    }
+    int start = wrapIndex(zoomAreaPtr->xStart, nvals);
+    int end = wrapIndex(zoomAreaPtr->xEnd, nvals);
+    int span = (end >= start) ?
+      (end - start + 1) : (nvals - start + end + 1);
+    if (span < 1)
+      span = 1;
+
+    double frac = (pos.x() - plotRect.left()) /
+      static_cast<double>(plotRect.width());
+    if (frac < 0.0)
+      frac = 0.0;
+    if (frac > 1.0)
+      frac = 1.0;
+    int pivot = wrapIndex(start +
+      static_cast<int>(frac * (span - 1) + 0.5), nvals);
+
+    int steps = event->angleDelta().y() / 120;
+    if (steps != 0) {
+      double factor = std::pow(1.2, steps);
+      int newSpan = static_cast<int>(span / factor + 0.5);
+      if (newSpan < 1)
+        newSpan = 1;
+      if (newSpan > nvals)
+        newSpan = nvals;
+      int offset = static_cast<int>(frac * (newSpan - 1) + 0.5);
+      int newStart = wrapIndex(pivot - offset, nvals);
+      int newEnd = wrapIndex(newStart + newSpan - 1, nvals);
+      zoomAreaPtr->xStart = newStart;
+      zoomAreaPtr->xEnd = newEnd;
+      updateZoomCenter();
+      updateZoomInterval();
+      update();
+    } else {
+      QWidget::wheelEvent(event);
+    }
+  }
+
   void mouseReleaseEvent(QMouseEvent *event) override
   {
     if (event->button() == Qt::LeftButton && infoBox) {
@@ -1064,6 +1124,7 @@ public:
   {
     updateStats();
     updateCenterSectSpin();
+    updateIntervalSpin();
     schedulePlotUpdate();
   }
 
@@ -1085,6 +1146,23 @@ public:
     centerSectSpin->blockSignals(true);
     centerSectSpin->setValue(sect);
     centerSectSpin->blockSignals(false);
+  }
+
+  void updateIntervalSpin()
+  {
+    if (!intervalSpin || arrayPtrs.isEmpty())
+      return;
+    int nvals = arrayPtrs[0]->nvals;
+    if (nvals < 1)
+      return;
+    int span = (area->xEnd >= area->xStart) ?
+      (area->xEnd - area->xStart + 1) :
+      (nvals - area->xStart + area->xEnd + 1);
+    int perSect = nsect > 0 ? std::max(1, nvals / nsect) : nvals;
+    int val = (span + perSect - 1) / perSect;
+    intervalSpin->blockSignals(true);
+    intervalSpin->setValue(val);
+    intervalSpin->blockSignals(false);
   }
 
   /**
@@ -1164,6 +1242,15 @@ static void updateZoomCenter()
 {
   if (zoomAreaWidget)
     zoomAreaWidget->updateCenterSectSpin();
+}
+
+/**
+ * @brief Synchronize the zoom plot interval widget.
+ */
+static void updateZoomInterval()
+{
+  if (zoomAreaWidget)
+    zoomAreaWidget->updateIntervalSpin();
 }
 
 /**
