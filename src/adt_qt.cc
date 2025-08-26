@@ -669,8 +669,16 @@ protected:
       int nvals = arrayPtrs[0]->nvals;
       int start = wrapIndex(area->xStart, nvals);
       int end = wrapIndex(area->xEnd, nvals);
-      double smin = arrayPtrs[0]->s[start];
-      double smax = arrayPtrs[0]->s[end] + (end < start ? stotal : 0.0);
+      int span = (end >= start) ? (end - start + 1) :
+        (nvals - start + end + 1);
+      double smin, smax;
+      if (span >= nvals) {
+        smin = 0.0;
+        smax = stotal;
+      } else {
+        smin = arrayPtrs[0]->s[start];
+        smax = arrayPtrs[0]->s[end] + (end < start ? stotal : 0.0);
+      }
       double range = smax - smin;
       auto xfroms = [&](double sval) {
         double s = sval;
@@ -740,9 +748,15 @@ protected:
         int end = wrapIndex(area->xEnd, nvals);
         int count = (end >= start) ?
           (end - start + 1) : (nvals - start + end + 1);
-        double smin = arrayPtrs[0]->s[start];
-        double smax = arrayPtrs[0]->s[end] + (end < start ? stotal : 0.0);
-        double range = smax - smin;
+        double smin, smax, range;
+        if (count >= nvals) {
+          smin = 0.0;
+          smax = stotal;
+        } else {
+          smin = arrayPtrs[0]->s[start];
+          smax = arrayPtrs[0]->s[end] + (end < start ? stotal : 0.0);
+        }
+        range = smax - smin;
         double frac = (event->pos().x() - plotRect.left()) /
           static_cast<double>(plotRect.width());
         double sval = smin + frac * range;
