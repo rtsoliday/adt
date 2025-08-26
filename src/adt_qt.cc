@@ -1302,6 +1302,7 @@ public:
     QString pvDir;
     QList<LoadMenuInfo> menus = readInitFile(initFile, adtHome, pvDir,
       customDirectory);
+    pvDirectory = pvDir;
     QMenu *loadMenu = fileMenu->addMenu("Load");
     for (const auto &menu : menus) {
       QMenu *sub = loadMenu->addMenu(menu.title);
@@ -1649,6 +1650,7 @@ public:
 private:
   QString adtHome;
   QString customDirectory;
+  QString pvDirectory;
   QString pvFilename;
   QString latFilename;
   QString refFilename;
@@ -2342,8 +2344,8 @@ private:
         if (SDDS_GetParameter(&table, const_cast<char *>("ADTLatticeFile"),
             &latfile) && latfile) {
           QString lf = latfile;
-          if (QFileInfo(lf).isRelative())
-            lf = QDir(adtHome).filePath(lf);
+          if (!lf.contains('/'))
+            lf = QDir(pvDirectory).filePath(lf);
           latFilename = lf;
           if (!readLatticeFile(lf, nsect, stotal)) {
             nsect = 0;
