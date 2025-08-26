@@ -716,7 +716,12 @@ protected:
           if (latLen[i] > 0) {
             double s2 = s + latLen[i];
             int x2 = static_cast<int>(xfroms(s2));
-            pmap.drawLine(x1, y0 + unit, x2, y0 + unit);
+            if (x2 >= x1) {
+              pmap.drawLine(x1, y0 + unit, x2, y0 + unit);
+            } else {
+              pmap.drawLine(x1, y0 + unit, plotRect.right(), y0 + unit);
+              pmap.drawLine(plotRect.left(), y0 + unit, x2, y0 + unit);
+            }
             pmap.drawLine(x2, y0 + unit, x2, y0);
           }
         }
