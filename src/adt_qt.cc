@@ -584,8 +584,14 @@ protected:
             (end - start + 1) : (nvals - start + end + 1);
           if (count < 1)
             return;
-          double smin = arr->s[start];
-          double smax = arr->s[end] + (end < start ? stotal : 0.0);
+          double smin, smax;
+          if (count >= nvals) {
+            smin = 0.0;
+            smax = stotal;
+          } else {
+            smin = arr->s[start];
+            smax = arr->s[end] + (end < start ? stotal : 0.0);
+          }
           double range = smax - smin;
           double xscale = plotRect.width() / range;
           if (lines || markers)
