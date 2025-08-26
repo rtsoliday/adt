@@ -599,7 +599,14 @@ protected:
           for (int i = 0; i < count; ++i) {
             int idx = (start + i) % nvals;
             double sval = arr->s[idx];
-            if (idx < start)
+            // Only adjust the coordinate for wrapped indices when we are
+            // displaying less than a full set of values. When the zoom span
+            // covers the entire array (count >= nvals), `start` may be
+            // non-zero but all points should map within [0, stotal] without
+            // an offset. Adjusting by `stotal` in that case pushed the left
+            // side of the plot off-screen, leaving behind artifacts from a
+            // previous paint and producing lines with incorrect colors.
+            if (count < nvals && idx < start)
               sval += stotal;
             double x = plotRect.left() + (sval - smin) * xscale;
             int y = mapY(diffVal(arr, vec, idx));
