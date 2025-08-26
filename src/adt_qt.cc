@@ -807,6 +807,19 @@ protected:
       infoBox->setAttribute(Qt::WA_DeleteOnClose);
       infoBox->setModal(false);
       infoBox->show();
+    } else if (event->button() == Qt::RightButton) {
+      if (this == zoomPlot && zoomAreaPtr && !arrayPtrs.isEmpty()) {
+        QRect plotRect = makePlotRect(width(), height());
+        if (!plotRect.contains(event->pos())) {
+          QWidget::mousePressEvent(event);
+          return;
+        }
+        rightDown = true;
+        lastRightX = event->pos().x();
+        dragRemainder = 0.0;
+      } else {
+        QWidget::mousePressEvent(event);
+      }
     } else if (event->button() == Qt::MiddleButton) {
       if (zoomPlot && zoomAreaPtr && this != zoomPlot && !arrayPtrs.isEmpty()) {
         QRect plotRect = makePlotRect(width(), height());
@@ -901,6 +914,48 @@ protected:
     }
   }
 
+  void mouseMoveEvent(QMouseEvent *event) override
+  {
+    if (!rightDown || this != zoomPlot || !zoomAreaPtr || arrayPtrs.isEmpty()) {
+      QWidget::mouseMoveEvent(event);
+      return;
+    }
+    QRect plotRect = makePlotRect(width(), height());
+    if (!plotRect.contains(event->pos()) || plotRect.width() < 1) {
+      QWidget::mouseMoveEvent(event);
+      return;
+    }
+    int dx = event->pos().x() - lastRightX;
+    if (dx == 0) {
+      QWidget::mouseMoveEvent(event);
+      return;
+    }
+    int nvals = arrayPtrs[0]->nvals;
+    if (nvals < 1) {
+      QWidget::mouseMoveEvent(event);
+      return;
+    }
+    int start = wrapIndex(zoomAreaPtr->xStart, nvals);
+    int end = wrapIndex(zoomAreaPtr->xEnd, nvals);
+    int span = (end >= start) ? (end - start + 1) : (nvals - start + end + 1);
+    if (span < 1)
+      span = 1;
+    double delta = -dx * (span / static_cast<double>(plotRect.width()));
+    dragRemainder += delta;
+    int shift = static_cast<int>(dragRemainder);
+    if (shift != 0) {
+      dragRemainder -= shift;
+      start = wrapIndex(start + shift, nvals);
+      end = wrapIndex(start + span - 1, nvals);
+      zoomAreaPtr->xStart = start;
+      zoomAreaPtr->xEnd = end;
+      updateZoomCenter();
+      updateZoomInterval();
+      update();
+    }
+    lastRightX = event->pos().x();
+  }
+
   void mouseReleaseEvent(QMouseEvent *event) override
   {
     if (event->button() == Qt::LeftButton && infoBox) {
@@ -908,6 +963,9 @@ protected:
         infoBox->close();
       else
         QWidget::mouseReleaseEvent(event);
+    } else if (event->button() == Qt::RightButton) {
+      rightDown = false;
+      QWidget::mouseReleaseEvent(event);
     } else {
       QWidget::mouseReleaseEvent(event);
     }
@@ -919,6 +977,9 @@ private:
   QPointer<QMessageBox> infoBox;
   QPixmap pixmap;
   QVector<QPointF> tmpPts;
+  bool rightDown = false;
+  int lastRightX = 0;
+  double dragRemainder = 0.0;
 };
 
 /**
