@@ -1015,6 +1015,8 @@ public:
     plot = new PlotWidget(adata, arrays, this);
     vbox->addWidget(plot, 1);
     int plotHeight = 148 + 1;
+    if (isZoomPlot)
+      plotHeight += 50;
     plot->setMinimumHeight(plotHeight);
     int topHeight = controls->sizeHint().height();
     if (titleBox)
