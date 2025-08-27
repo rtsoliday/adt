@@ -359,7 +359,8 @@ protected:
       aps_bits, QImage::Format_MonoLSB);
     p.drawPixmap(50, (height() - aps_height) / 2, bitmap);
 
-    QFont font("Monospace", 9);
+    QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    font.setPointSize(9);
     p.setFont(font);
     QFontMetrics fm(font);
     int fheight = fm.height();
