@@ -14,9 +14,8 @@
 #include "aps.icon"
 #include "adtVersion.h"
 
-#include <sys/utsname.h>
-
 #include <epicsVersion.h>
+#include <QSysInfo>
 #include <QApplication>
 #include <QBitmap>
 #include <QImage>
@@ -379,13 +378,10 @@ protected:
     drawCentered(QString("Version %1 %2").arg(ADT_VERSION_STRING)
       .arg(EPICS_VERSION_STRING), ystart + linespacing);
 
-    struct utsname name;
-    if (uname(&name) != -1) {
-      drawCentered(QString("Running %1 %2 on %3")
-        .arg(name.sysname)
-        .arg(name.release)
-        .arg(name.nodename), ystart + 2 * linespacing);
-    }
+    drawCentered(QString("Running %1 %2 on %3")
+      .arg(QSysInfo::kernelType())
+      .arg(QSysInfo::kernelVersion())
+      .arg(QSysInfo::machineHostName()), ystart + 2 * linespacing);
 
     drawCentered("Please Send Comments and Bugs to soliday@anl.gov",
       ystart + 3 * linespacing);
@@ -1635,14 +1631,10 @@ public:
     QAction *versionAct = helpMenu->addAction("Version");
     connect(versionAct, &QAction::triggered, this, [this]()
     {
-      struct utsname info;
-      QString unameStr;
-      if (uname(&info) != -1) {
-        unameStr = QString("Running %1 %2 on %3")
-          .arg(info.sysname)
-          .arg(info.release)
-          .arg(info.nodename);
-      }
+      QString unameStr = QString("Running %1 %2 on %3")
+        .arg(QSysInfo::kernelType())
+        .arg(QSysInfo::kernelVersion())
+        .arg(QSysInfo::machineHostName());
       QString msg = QString("%1 %2\n\nWritten by Dwarfs in the Waterfall Glen\n\n%3")
         .arg(ADT_VERSION_STRING)
         .arg(EPICS_VERSION_STRING)

@@ -25,8 +25,13 @@ ifdef MOTIF
   CFLAGS += -I$(MOTIF_INC) -I$(X11_INC)
   CCFLAGS += -I$(MOTIF_INC) -I$(X11_INC)
 else
+ ifeq ($(OS), Windows)
+  CCFLAGS += /std:c++17 /Zc:__cplusplus /permissive- -I"C:\\Qt\\6.8.2\\msvc2022_64\\include" -I"C:\\Qt\\6.8.2\\msvc2022_64\\include\\QtCore" -I"C:\\Qt\\6.8.2\\msvc2022_64\\include\\QtGui" -I"C:\\Qt\\6.8.2\\msvc2022_64\\include\\QtWidgets"
+  LDFLAGS += /LIBPATH:"C:\\Qt\\6.8.2\\msvc2022_64\\lib" Qt6PrintSupport.lib Qt6Widgets.lib Qt6Gui.lib Qt6Core.lib
+ else
   CCFLAGS += $(shell pkg-config --cflags Qt5Widgets)
   LDFLAGS += $(shell pkg-config --libs Qt5Widgets)
+ endif
 endif
 #-D_GNU_SOURCE -D_DEFAULT_SOURCE
 #-DACCESS_SECURITY -D_NO_PROTO
@@ -67,6 +72,7 @@ endif
 
 ifeq ($(OS), Windows)
   CFLAGS += -wd4101 -wd4244 -wd4250 -wd4267 -wd4275 -w44355 -w44344 -w44251 -I$(EPICS_BASE)/include/compiler/msvc -I$(EPICS_BASE)/include/os/WIN32 -I$(SDDS_REPO)/lzma -D_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING -DEPICS_CALL_DLL
+  CCFLAGS += -wd4101 -wd4244 -wd4250 -wd4267 -wd4275 -w44355 -w44344 -w44251 -I$(EPICS_BASE)/include/compiler/msvc -I$(EPICS_BASE)/include/os/WIN32 -I$(SDDS_REPO)/lzma -D_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING -DEPICS_CALL_DLL
   PROD_LIBS += gsl.lib gslcblas.lib  ws2_32.lib
   PROD_LIBS_SDDS = mdbcommon.lib matlib.lib SDDS1.lib namelist.lib rpnlib.lib mdbmth.lib mdblib.lib lzma.lib z.lib \
                   pvaClient.lib nt.lib pvAccessCA.lib pvAccess.lib pvData.lib pvDatabase.lib ca.lib Com.lib
