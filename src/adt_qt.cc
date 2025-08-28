@@ -1907,10 +1907,10 @@ private:
       tbuf);
     fprintf(file,
       "&parameter name=ADTNArrays type=short fixed_value=%d &end\n",
-      arrays.size() + 1);
+      static_cast<int>(arrays.size()) + 1);
     fprintf(file,
       "&parameter name=ADTNAreas type=short fixed_value=%d &end\n",
-      areas.size() + 1);
+      static_cast<int>(areas.size()) + 1);
     fprintf(file, "&parameter name=ADTHeading type=string &end\n");
     fprintf(file, "&parameter name=ADTUnits type=string &end\n");
     fprintf(file, "&parameter name=ADTScreenTitle type=string &end\n");
