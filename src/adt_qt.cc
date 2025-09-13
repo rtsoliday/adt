@@ -440,7 +440,7 @@ protected:
         v -= arr->refVals[idx];
       if (diffOn && arr->saveVals[diffSet].size() == arr->nvals)
         v -= arr->saveVals[diffSet][idx];
-      return v;
+      return v * arr->scaleFactor;
     };
 
     if (grid) {
