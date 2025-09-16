@@ -57,6 +57,7 @@
 #include <QTemporaryFile>
 #include <limits>
 #include <cmath>
+#include <cstdint>
 #include <algorithm>
 #include <cstring>
 #include <cstdio>
@@ -98,6 +99,7 @@ static double nstat = 0.0, nstatTime = 0.0, stotal = 0.0;
 static QVector<QString> latNames;
 static QVector<double> latS, latLen;
 static QVector<short> latHeight;
+static bool latRing = false;
 
 struct AreaData
 {
@@ -195,6 +197,124 @@ static int wrapIndex(int idx, int n)
 {
   idx %= n;
   return idx < 0 ? idx + n : idx;
+}
+
+/**
+ * @brief Locate the index at or above a requested s value.
+ */
+static int indexAbove(double sval, const QVector<double> &array)
+{
+  int nmax = array.size();
+  if (nmax < 1 || stotal <= 0.0)
+    return -1;
+  double s = sval;
+  if (s < 0.0)
+    s += stotal;
+  if (s > stotal)
+    s -= stotal;
+  int first = 0;
+  int last = nmax - 1;
+  int istart = static_cast<int>(nmax * (s / stotal) - 1);
+  if (istart < first)
+    istart = first;
+  else if (istart > last)
+    istart = last;
+  if (s > array[istart]) {
+    for (int i = istart + 1; i <= last; ++i) {
+      if (s <= array[i])
+        return i;
+    }
+    return -1;
+  } else if (s < array[istart]) {
+    int ii = istart;
+    for (int i = istart - 1; i >= first; --i) {
+      if (s > array[i])
+        return ii;
+      ii = i;
+    }
+    return ii;
+  }
+  return istart;
+}
+
+/**
+ * @brief Locate the index at or below a requested s value.
+ */
+static int indexBelow(double sval, const QVector<double> &array)
+{
+  int nmax = array.size();
+  if (nmax < 1 || stotal <= 0.0)
+    return -1;
+  double s = sval;
+  if (s < 0.0)
+    s += stotal;
+  if (s > stotal)
+    s -= stotal;
+  int first = 0;
+  int last = nmax - 1;
+  int istart = static_cast<int>(nmax * (s / stotal) + 1);
+  if (istart < first)
+    istart = first;
+  else if (istart > last)
+    istart = last;
+  if (s < array[istart]) {
+    for (int i = istart - 1; i >= first; --i) {
+      if (s >= array[i])
+        return i;
+    }
+    return -1;
+  } else if (s > array[istart]) {
+    int ii = istart;
+    for (int i = istart + 1; i <= last; ++i) {
+      if (s < array[i])
+        return ii;
+      ii = i;
+    }
+    return ii;
+  }
+  return istart;
+}
+
+/**
+ * @brief Determine the index range intersecting a span of s values.
+ */
+static void indexLimits(double smin, double smax, const QVector<double> &array,
+  int &imin, int &imax)
+{
+  int nmax = array.size();
+  if (nmax < 1) {
+    imin = imax = 0;
+    return;
+  }
+  if (!latRing || stotal <= 0.0 || nmax == 1) {
+    imin = 0;
+    imax = nmax - 1;
+    return;
+  }
+  int imin0 = indexBelow(smin, array);
+  double soff = 0.0;
+  imin = imin0;
+  if (imin0 < 0) {
+    imin0 = nmax - 1;
+    imin = -1;
+    soff += stotal;
+  }
+  while (array[imin0] > smin + soff) {
+    imin -= nmax;
+    soff += stotal;
+  }
+  int imax0 = indexAbove(smax, array);
+  imax = imax0;
+  soff = 0.0;
+  if (imax0 < 0) {
+    imax0 = (nmax > 1) ? 1 : 0;
+    imax = nmax + 1;
+    soff -= stotal;
+  }
+  while (array[imax0] < smax + soff) {
+    imax += nmax;
+    soff -= stotal;
+  }
 }
 
 /**
@@ -296,18 +416,23 @@ static bool readLatticeFile(const QString &filename, int &nsectOut,
   double &stotalOut)
 {
   latNames.clear(); latS.clear(); latLen.clear(); latHeight.clear();
+  latRing = false;
   SDDS_TABLE table;
   QByteArray fname = filename.toUtf8();
   if (!SDDS_InitializeInput(&table, fname.data()))
     return false;
-  if (SDDS_ReadTable(&table) != 1)
+  if (SDDS_ReadTable(&table) != 1) {
+    SDDS_Terminate(&table);
     return false;
+  }
   bool ok = false;
   char *type = NULL;
   type = SDDS_GetParameterAsString(&table, const_cast<char *>("ADTFileType"), NULL);
   if (type && !strcmp(type, "ADTLATTICE")) {
     int32_t ns;
     double st;
+    int32_t ringVal = 1;
+    SDDS_GetParameterAsLong(&table, const_cast<char *>("Ring"), &ringVal);
     if (SDDS_GetParameterAsLong(&table, const_cast<char *>("Nsectors"), &ns) &&
         SDDS_GetParameterAsDouble(&table, const_cast<char *>("Stotal"), &st)) {
       nsectOut = static_cast<int>(ns);
@@ -328,6 +453,7 @@ static bool readLatticeFile(const QString &filename, int &nsectOut,
           latLen.append(len[i]);
           latHeight.append(height[i]);
         }
+        latRing = ringVal != 0;
         ok = true;
       }
       freeSddsStrings(rows, names);
@@ -568,108 +694,208 @@ protected:
       return;
     }
 
-      auto drawArray = [&](ArrayData *arr, const QVector<double> &vec,
-        const QColor &clr) {
-        if (arr->nvals < 1 || vec.size() != arr->nvals)
-          return;
-        pmap.setPen(clr);
-        if (area == zoomAreaPtr) {
-          int nvals = arr->nvals;
-          int start = wrapIndex(area->xStart, nvals);
-          int end = wrapIndex(area->xEnd, nvals);
-          int count = (end >= start) ?
-            (end - start + 1) : (nvals - start + end + 1);
-          if (count < 1)
-            return;
-          double smin, smax;
-          if (count >= nvals) {
-            smin = 0.0;
-            smax = stotal;
-          } else {
-            smin = arr->s[start];
-            smax = arr->s[end] + (end < start ? stotal : 0.0);
-          }
-          double range = smax - smin;
-          double xscale = plotRect.width() / range;
-          if (lines || markers)
-            tmpPts.resize(count);
-          for (int i = 0; i < count; ++i) {
-            int idx = (start + i) % nvals;
-            double sval = arr->s[idx];
-            // Only adjust the coordinate for wrapped indices when we are
-            // displaying less than a full set of values. When the zoom span
-            // covers the entire array (count >= nvals), `start` may be
-            // non-zero but all points should map within [0, stotal] without
-            // an offset. Adjusting by `stotal` in that case pushed the left
-            // side of the plot off-screen, leaving behind artifacts from a
-            // previous paint and producing lines with incorrect colors.
-            if (count < nvals && idx < start)
-              sval += stotal;
-            double x = plotRect.left() + (sval - smin) * xscale;
-            int y = mapY(diffVal(arr, vec, idx));
-            int xi = static_cast<int>(x);
-            if (bars)
-              pmap.drawLine(xi, y0, xi, y);
-            if (lines || markers)
-              tmpPts[i] = QPointF(x, y);
-          }
-          if (lines)
-            pmap.drawPolyline(tmpPts.constData(), count);
-          if (markers) {
-            QPen oldPen = pmap.pen();
-            QPen markerPen(clr, 3);
-            markerPen.setCapStyle(Qt::SquareCap);
-            pmap.setPen(markerPen);
-            pmap.drawPoints(tmpPts.constData(), count);
-            pmap.setPen(oldPen);
-          }
-        } else {
-          int start = area->xStart;
-          int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
-          if (start < 0)
-            start = 0;
-          if (end > arr->nvals)
-            end = arr->nvals;
-          int count = end - start;
-          if (count < 1)
-            return;
-          double xstep = plotRect.width() /
-            static_cast<double>(count);
-          double x = plotRect.left() + xstep / 2.0;
-          if (lines || markers)
-            tmpPts.resize(count);
-          for (int i = start; i < end; ++i, x += xstep) {
-            int y = mapY(diffVal(arr, vec, i));
-            int xi = static_cast<int>(x);
-            if (bars)
-              pmap.drawLine(xi, y0, xi, y);
-            if (lines || markers)
-              tmpPts[i - start] = QPointF(x, y);
-          }
-          if (lines)
-            pmap.drawPolyline(tmpPts.constData(), count);
-          if (markers) {
-            QPen oldPen = pmap.pen();
-            QPen markerPen(clr, 3);
-            markerPen.setCapStyle(Qt::SquareCap);
-            pmap.setPen(markerPen);
-            pmap.drawPoints(tmpPts.constData(), count);
-            pmap.setPen(oldPen);
-          }
-        }
-      };
+    struct ZoomLimit
+    {
+      int min = 0;
+      int max = -1;
+    };
+    QVector<ZoomLimit> zoomLimits;
+    double zoomSmin = 0.0;
+    double zoomSmax = 0.0;
+    double zoomRange = 0.0;
+    bool useZoomLimits = false;
+    bool zoomWrap = latRing && stotal > 0.0;
 
-      if (displaySet >= 0) {
-        for (auto arr : arrayPtrs) {
-          QColor clr = displayColor;
-          if (clr == arr->color)
-            clr = Qt::green;
-          drawArray(arr, arr->saveVals[displaySet], clr);
+    if (area == zoomAreaPtr && !arrayPtrs.isEmpty()) {
+      ArrayData *baseArr = arrayPtrs[0];
+      int baseN = baseArr->nvals;
+      if (baseN > 0 && baseArr->s.size() == baseN) {
+        int baseStart = wrapIndex(area->xStart, baseN);
+        int baseEnd = wrapIndex(area->xEnd, baseN);
+        int span = (baseEnd >= baseStart) ?
+          (baseEnd - baseStart + 1) : (baseN - baseStart + baseEnd + 1);
+        if (span >= baseN && stotal > 0.0) {
+          zoomSmin = 0.0;
+          zoomSmax = stotal;
+        } else {
+          zoomSmin = baseArr->s[baseStart];
+          zoomSmax = baseArr->s[baseEnd] + (baseEnd < baseStart ? stotal : 0.0);
+        }
+        zoomRange = zoomSmax - zoomSmin;
+        if (zoomRange <= 0.0 && zoomWrap)
+          zoomRange = stotal;
+        if (zoomRange > 0.0) {
+          useZoomLimits = true;
+          zoomLimits.resize(arrayPtrs.size());
+          for (int i = 0; i < arrayPtrs.size(); ++i) {
+            auto arr = arrayPtrs[i];
+            ZoomLimit limit;
+            if (arr->nvals > 0 && arr->s.size() == arr->nvals) {
+              if (zoomWrap)
+                indexLimits(zoomSmin, zoomSmax, arr->s, limit.min, limit.max);
+              else {
+                limit.min = 0;
+                limit.max = arr->nvals - 1;
+              }
+            }
+            zoomLimits[i] = limit;
+          }
         }
       }
+    }
 
-      for (auto arr : arrayPtrs)
-        drawArray(arr, arr->vals, arr->color);
+    bool applyZoomLimits = useZoomLimits && zoomRange > 0.0 &&
+      zoomLimits.size() == arrayPtrs.size();
+    double zoomXScale = applyZoomLimits ? plotRect.width() / zoomRange : 0.0;
+
+    auto drawArray = [&](int arrIndex, ArrayData *arr,
+      const QVector<double> &vec, const QColor &clr) {
+      if (arr->nvals < 1 || vec.size() != arr->nvals)
+        return;
+      pmap.setPen(clr);
+      if (area == zoomAreaPtr) {
+        bool drewZoom = false;
+        if (applyZoomLimits && arrIndex >= 0 && arrIndex < zoomLimits.size() &&
+            arr->s.size() == arr->nvals) {
+          ZoomLimit limit = zoomLimits[arrIndex];
+          int count = limit.max - limit.min + 1;
+          if (count > 0) {
+            if (lines || markers)
+              tmpPts.resize(count);
+            for (int i = 0; i < count; ++i) {
+              int idx = limit.min + i;
+              int wrapped = idx;
+              double soff = 0.0;
+              while (wrapped >= arr->nvals) {
+                wrapped -= arr->nvals;
+                soff += stotal;
+              }
+              while (wrapped < 0) {
+                wrapped += arr->nvals;
+                soff -= stotal;
+              }
+              double sval = arr->s[wrapped] + soff;
+              if (zoomWrap) {
+                while (sval < zoomSmin)
+                  sval += stotal;
+                while (sval > zoomSmax)
+                  sval -= stotal;
+              }
+              double x = plotRect.left() + (sval - zoomSmin) * zoomXScale;
+              int y = mapY(diffVal(arr, vec, wrapped));
+              int xi = static_cast<int>(x);
+              if (bars)
+                pmap.drawLine(xi, y0, xi, y);
+              if (lines || markers)
+                tmpPts[i] = QPointF(x, y);
+            }
+            if (lines)
+              pmap.drawPolyline(tmpPts.constData(), count);
+            if (markers) {
+              QPen oldPen = pmap.pen();
+              QPen markerPen(clr, 3);
+              markerPen.setCapStyle(Qt::SquareCap);
+              pmap.setPen(markerPen);
+              pmap.drawPoints(tmpPts.constData(), count);
+              pmap.setPen(oldPen);
+            }
+            drewZoom = true;
+          }
+        }
+        if (drewZoom)
+          return;
+        int nvals = arr->nvals;
+        int start = wrapIndex(area->xStart, nvals);
+        int end = wrapIndex(area->xEnd, nvals);
+        int count = (end >= start) ?
+          (end - start + 1) : (nvals - start + end + 1);
+        if (count < 1)
+          return;
+        double smin, smax;
+        if (count >= nvals) {
+          smin = 0.0;
+          smax = stotal;
+        } else {
+          smin = arr->s[start];
+          smax = arr->s[end] + (end < start ? stotal : 0.0);
+        }
+        double range = smax - smin;
+        double xscale = plotRect.width() / range;
+        if (lines || markers)
+          tmpPts.resize(count);
+        for (int i = 0; i < count; ++i) {
+          int idx = (start + i) % nvals;
+          double sval = arr->s[idx];
+          if (count < nvals && idx < start)
+            sval += stotal;
+          double x = plotRect.left() + (sval - smin) * xscale;
+          int y = mapY(diffVal(arr, vec, idx));
+          int xi = static_cast<int>(x);
+          if (bars)
+            pmap.drawLine(xi, y0, xi, y);
+          if (lines || markers)
+            tmpPts[i] = QPointF(x, y);
+        }
+        if (lines)
+          pmap.drawPolyline(tmpPts.constData(), count);
+        if (markers) {
+          QPen oldPen = pmap.pen();
+          QPen markerPen(clr, 3);
+          markerPen.setCapStyle(Qt::SquareCap);
+          pmap.setPen(markerPen);
+          pmap.drawPoints(tmpPts.constData(), count);
+          pmap.setPen(oldPen);
+        }
+      } else {
+        int start = area->xStart;
+        int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
+        if (start < 0)
+          start = 0;
+        if (end > arr->nvals)
+          end = arr->nvals;
+        int count = end - start;
+        if (count < 1)
+          return;
+        double xstep = plotRect.width() /
+          static_cast<double>(count);
+        double x = plotRect.left() + xstep / 2.0;
+        if (lines || markers)
+          tmpPts.resize(count);
+        for (int i = start; i < end; ++i, x += xstep) {
+          int y = mapY(diffVal(arr, vec, i));
+          int xi = static_cast<int>(x);
+          if (bars)
+            pmap.drawLine(xi, y0, xi, y);
+          if (lines || markers)
+            tmpPts[i - start] = QPointF(x, y);
+        }
+        if (lines)
+          pmap.drawPolyline(tmpPts.constData(), count);
+        if (markers) {
+          QPen oldPen = pmap.pen();
+          QPen markerPen(clr, 3);
+          markerPen.setCapStyle(Qt::SquareCap);
+          pmap.setPen(markerPen);
+          pmap.drawPoints(tmpPts.constData(), count);
+          pmap.setPen(oldPen);
+        }
+      }
+    };
+
+    if (displaySet >= 0) {
+      for (int i = 0; i < arrayPtrs.size(); ++i) {
+        auto arr = arrayPtrs[i];
+        QColor clr = displayColor;
+        if (clr == arr->color)
+          clr = Qt::green;
+        drawArray(i, arr, arr->saveVals[displaySet], clr);
+      }
+    }
+
+    for (int i = 0; i < arrayPtrs.size(); ++i) {
+      auto arr = arrayPtrs[i];
+      drawArray(i, arr, arr->vals, arr->color);
+    }
 
       if (this == zoomPlot && nsect > 0 && stotal > 0.0 && !arrayPtrs.isEmpty() &&
           arrayPtrs[0]->nvals > 0) {
@@ -699,20 +925,37 @@ protected:
         return plotRect.left() + ((s - smin) / range) * plotRect.width();
       };
       int bunit = static_cast<int>(-0.015 * plotRect.height());
-      for (int i = 0; i < latS.size(); ++i) {
-        double s = latS[i];
-        double sadd = s;
-        if (sadd < smin)
-          sadd += stotal;
-        if (sadd > smax)
-          sadd -= stotal;
-        if (sadd >= smin && sadd <= smax) {
-          int x1 = static_cast<int>(xfroms(s));
-          int unit = latHeight[i] * bunit;
+      if (!latS.isEmpty() && range > 0.0) {
+        int latCount = static_cast<int>(latS.size());
+        int latMin = 0;
+        int latMax = latCount - 1;
+        if (latRing)
+          indexLimits(smin, smax, latS, latMin, latMax);
+        for (int iis = latMin; iis <= latMax; ++iis) {
+          int idx = iis;
+          double soff = 0.0;
+          while (idx >= latCount) {
+            idx -= latCount;
+            soff += stotal;
+          }
+          while (idx < 0) {
+            idx += latCount;
+            soff -= stotal;
+          }
+          double sdraw = latS[idx] + soff;
+          double sadd = sdraw;
+          if (sadd < smin)
+            sadd += stotal;
+          if (sadd > smax)
+            sadd -= stotal;
+          if (sadd < smin || sadd > smax)
+            continue;
+          int x1 = static_cast<int>(std::lround(xfroms(sdraw)));
+          int unit = latHeight[idx] * bunit;
           pmap.drawLine(x1, y0, x1, y0 + unit);
-          if (latLen[i] > 0) {
-            double s2 = s + latLen[i];
-            int x2 = static_cast<int>(xfroms(s2));
+          if (latLen[idx] > 0.0) {
+            double s2 = latS[idx] + latLen[idx] + soff;
+            int x2 = static_cast<int>(std::lround(xfroms(s2)));
             if (x2 >= x1) {
               pmap.drawLine(x1, y0 + unit, x2, y0 + unit);
             } else {
@@ -2438,6 +2681,7 @@ private:
           if (!readLatticeFile(lf, nsect, stotal)) {
             nsect = 0;
             stotal = 0.0;
+            latRing = false;
           }
           SDDS_Free(latfile);
         } else {
@@ -2447,6 +2691,7 @@ private:
           latS.clear();
           latLen.clear();
           latHeight.clear();
+          latRing = false;
         }
         first = false;
       }
