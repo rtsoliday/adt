@@ -31,6 +31,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QPainter>
+#include <QPalette>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPen>
@@ -95,6 +96,7 @@ static bool markers = true, lines = true, bars = false, grid = true,
   refOn = true, referenceLoaded = false;
 static int diffSet = -1, displaySet = -1, nsect = 0;
 static QColor displayColor("Grey40");
+static const QColor backgroundColor("#CCCCCC");
 static double nstat = 0.0, nstatTime = 0.0, stotal = 0.0;
 static QVector<QString> latNames;
 static QVector<double> latS, latLen;
@@ -479,7 +481,7 @@ protected:
   void paintEvent(QPaintEvent *) override
   {
     QPainter p(this);
-    p.fillRect(rect(), Qt::white);
+    p.fillRect(rect(), backgroundColor);
     QBitmap bitmap = QBitmap::fromData(QSize(aps_width, aps_height),
       aps_bits, QImage::Format_MonoLSB);
     p.drawPixmap(50, (height() - aps_height) / 2, bitmap);
@@ -1245,6 +1247,10 @@ public:
     bool isZoomPlot = false)
     : QWidget(parent), area(adata), arrayPtrs(arrays)
   {
+    setAutoFillBackground(true);
+    QPalette pal = palette();
+    pal.setColor(QPalette::Window, backgroundColor);
+    setPalette(pal);
     auto vbox = new QVBoxLayout(this);
     vbox->setContentsMargins(0, 0, 0, 0);
 
@@ -1620,6 +1626,10 @@ public:
   {
     auto logo = new LogoWidget(this);
     setCentralWidget(logo);
+    setAutoFillBackground(true);
+    QPalette mainPal = palette();
+    mainPal.setColor(QPalette::Window, backgroundColor);
+    setPalette(mainPal);
     pollTimer = new QTimer(this);
     connect(pollTimer, &QTimer::timeout, this, [this]() { pollPvUpdate(); });
 
@@ -1785,7 +1795,7 @@ public:
         }
       }
     });
-    QAction *markersAct = viewMenu->addAction("Markers");
+    markersAct = viewMenu->addAction("Markers");
     markersAct->setCheckable(true);
     markersAct->setChecked(markers);
     connect(markersAct, &QAction::toggled, this, [this](bool checked)
@@ -1794,7 +1804,7 @@ public:
       for (auto aw : areaWidgets)
         aw->refresh();
     });
-    QAction *linesAct = viewMenu->addAction("Lines");
+    linesAct = viewMenu->addAction("Lines");
     linesAct->setCheckable(true);
     linesAct->setChecked(lines);
     connect(linesAct, &QAction::toggled, this, [this](bool checked)
@@ -1803,7 +1813,7 @@ public:
       for (auto aw : areaWidgets)
         aw->refresh();
     });
-    QAction *barsAct = viewMenu->addAction("Bars");
+    barsAct = viewMenu->addAction("Bars");
     barsAct->setCheckable(true);
     barsAct->setChecked(bars);
     connect(barsAct, &QAction::toggled, this, [this](bool checked)
@@ -1812,7 +1822,7 @@ public:
       for (auto aw : areaWidgets)
         aw->refresh();
     });
-    QAction *gridAct = viewMenu->addAction("Grid");
+    gridAct = viewMenu->addAction("Grid");
     gridAct->setCheckable(true);
     gridAct->setChecked(grid);
     connect(gridAct, &QAction::toggled, this, [this](bool checked)
@@ -1821,7 +1831,7 @@ public:
       for (auto aw : areaWidgets)
         aw->refresh();
     });
-    QAction *maxminAct = viewMenu->addAction("Max/Min");
+    maxminAct = viewMenu->addAction("Max/Min");
     maxminAct->setCheckable(true);
     maxminAct->setChecked(showmaxmin);
     connect(maxminAct, &QAction::toggled, this, [this](bool checked)
@@ -1830,7 +1840,7 @@ public:
       for (auto aw : areaWidgets)
         aw->refresh();
     });
-    QAction *fillAct = viewMenu->addAction("Filled Max/Min");
+    fillAct = viewMenu->addAction("Filled Max/Min");
     fillAct->setCheckable(true);
     fillAct->setChecked(fillmaxmin);
     connect(fillAct, &QAction::toggled, this, [this](bool checked)
@@ -1993,6 +2003,12 @@ private:
   AreaWidget *zoomWidget = nullptr;
   QAction *refAct = nullptr;
   QAction *zoomAct = nullptr;
+  QAction *markersAct = nullptr;
+  QAction *linesAct = nullptr;
+  QAction *barsAct = nullptr;
+  QAction *gridAct = nullptr;
+  QAction *maxminAct = nullptr;
+  QAction *fillAct = nullptr;
   AreaData zoomArea;
   bool zoomOn = true;
   int initZoomSector = 0;
@@ -2009,6 +2025,22 @@ private:
   {
     for (auto aw : areaWidgets)
       aw->refresh();
+  }
+
+  void updateViewActions()
+  {
+    if (markersAct)
+      markersAct->setChecked(markers);
+    if (linesAct)
+      linesAct->setChecked(lines);
+    if (barsAct)
+      barsAct->setChecked(bars);
+    if (gridAct)
+      gridAct->setChecked(grid);
+    if (maxminAct)
+      maxminAct->setChecked(showmaxmin);
+    if (fillAct)
+      fillAct->setChecked(fillmaxmin);
   }
 
   void pollPvUpdate()
@@ -2671,6 +2703,25 @@ private:
         if (SDDS_GetParameterAsLong(&table,
             const_cast<char *>("ADTTimeInterval"), &templong))
           timeInterval = static_cast<int>(templong);
+        if (SDDS_GetParameterAsLong(&table,
+            const_cast<char *>("ADTMarkers"), &templong))
+          markers = templong != 0;
+        if (SDDS_GetParameterAsLong(&table,
+            const_cast<char *>("ADTLines"), &templong))
+          lines = templong != 0;
+        if (SDDS_GetParameterAsLong(&table,
+            const_cast<char *>("ADTBars"), &templong))
+          bars = templong != 0;
+        if (SDDS_GetParameterAsLong(&table,
+            const_cast<char *>("ADTGrid"), &templong))
+          grid = templong != 0;
+        if (SDDS_GetParameterAsLong(&table,
+            const_cast<char *>("ADTMaxMin"), &templong))
+          showmaxmin = templong != 0;
+        if (SDDS_GetParameterAsLong(&table,
+            const_cast<char *>("ADTFillMaxMin"), &templong))
+          fillmaxmin = templong != 0;
+        updateViewActions();
         char *latfile = NULL;
         if (SDDS_GetParameter(&table, const_cast<char *>("ADTLatticeFile"),
             &latfile) && latfile) {
@@ -2887,6 +2938,10 @@ private:
     nsymbols = latNames.size();
 
     QWidget *central = new QWidget;
+    central->setAutoFillBackground(true);
+    QPalette centralPal = central->palette();
+    centralPal.setColor(QPalette::Window, backgroundColor);
+    central->setPalette(centralPal);
     QVBoxLayout *layout = new QVBoxLayout(central);
     for (AreaData &area : areas) {
       QVector<ArrayData *> arrs;
