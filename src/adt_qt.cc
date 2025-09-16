@@ -63,6 +63,7 @@
 #include <cstring>
 #include <cstdio>
 #include <ctime>
+#include <functional>
 
 #include <SDDS.h>
 #include <QDir>
@@ -102,6 +103,7 @@ static QVector<QString> latNames;
 static QVector<double> latS, latLen;
 static QVector<short> latHeight;
 static bool latRing = false;
+static std::function<void()> resetFilledExtremaCallback;
 
 struct AreaData
 {
@@ -1072,7 +1074,12 @@ protected:
         lastRightX = event->pos().x();
         dragRemainder = 0.0;
       } else {
-        QWidget::mousePressEvent(event);
+        QRect plotRect = makePlotRect(width(), height());
+        if (plotRect.contains(event->pos()) && resetFilledExtremaCallback) {
+          resetFilledExtremaCallback();
+        } else {
+          QWidget::mousePressEvent(event);
+        }
       }
     } else if (event->button() == Qt::MiddleButton) {
       if (zoomPlot && zoomAreaPtr && this != zoomPlot && !arrayPtrs.isEmpty()) {
@@ -1630,6 +1637,15 @@ public:
     QPalette mainPal = palette();
     mainPal.setColor(QPalette::Window, backgroundColor);
     setPalette(mainPal);
+
+    if (QMenuBar *bar = menuBar())
+      bar->setStyleSheet(
+        "QMenuBar { background-color: #597EFF; color: white; }"
+        "QMenuBar::item { background: transparent; color: white; }"
+        "QMenuBar::item:hover { background-color: #4767D6; color: white; }"
+        "QMenuBar::item:selected { background-color: #4767D6; color: white; }"
+        "QMenuBar::item:pressed { background-color: #4767D6; color: white; }");
+
     pollTimer = new QTimer(this);
     connect(pollTimer, &QTimer::timeout, this, [this]() { pollPvUpdate(); });
 
@@ -1757,22 +1773,13 @@ public:
         zoomArea.tempclear = true;
       resetGraph();
     });
+    auto resetFunc = [this]() { resetFilledExtrema(); };
     QAction *resetAct = optionsMenu->addAction("Reset Max/Min");
-    connect(resetAct, &QAction::triggered, this, [this]()
+    connect(resetAct, &QAction::triggered, this, [resetFunc](bool)
     {
-      nstat = 0.0;
-      nstatTime = 0.0;
-      for (ArrayData &arr : arrays) {
-        arr.minVals.fill(LARGEVAL);
-        arr.maxVals.fill(-LARGEVAL);
-        arr.runSdev = 0.0;
-        arr.runAvg = 0.0;
-        arr.runMax = 0.0;
-      }
-      for (AreaData &area : areas)
-        area.tempclear = true;
-      resetGraph();
+      resetFunc();
     });
+    resetFilledExtremaCallback = resetFunc;
 
     QMenu *viewMenu = menuBar()->addMenu("View");
     QAction *timingAct = viewMenu->addAction("Timing...");
@@ -1919,6 +1926,7 @@ public:
     if (pollTimer)
       pollTimer->stop();
     zoomAreaWidget = nullptr;
+    resetFilledExtremaCallback = {};
   }
 
   void storeSet(int n)
@@ -2020,6 +2028,22 @@ private:
   int timeInterval = 2000;
   bool caStarted = false;
   int nsymbols = 0;
+
+  void resetFilledExtrema()
+  {
+    nstat = 0.0;
+    nstatTime = 0.0;
+    for (ArrayData &arr : arrays) {
+      arr.minVals.fill(LARGEVAL);
+      arr.maxVals.fill(-LARGEVAL);
+      arr.runSdev = 0.0;
+      arr.runAvg = 0.0;
+      arr.runMax = 0.0;
+    }
+    for (AreaData &area : areas)
+      area.tempclear = true;
+    resetGraph();
+  }
 
   void resetGraph()
   {
