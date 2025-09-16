@@ -752,6 +752,62 @@ protected:
       zoomLimits.size() == arrayPtrs.size();
     double zoomXScale = applyZoomLimits ? plotRect.width() / zoomRange : 0.0;
 
+    auto drawPolylineWrapped = [&](const QVector<QPointF> &points,
+      bool allowWrap) {
+      if (points.size() < 2) {
+        return;
+      }
+      if (!allowWrap) {
+        pmap.drawPolyline(points.constData(), points.size());
+        return;
+      }
+      double width = static_cast<double>(plotRect.width());
+      if (width <= 0.0) {
+        pmap.drawPolyline(points.constData(), points.size());
+        return;
+      }
+      double left = static_cast<double>(plotRect.left());
+      double right = static_cast<double>(plotRect.right());
+      double threshold = width / 2.0;
+      QPointF prev = points[0];
+      for (int i = 1; i < points.size(); ++i) {
+        QPointF curr = points[i];
+        double dx = curr.x() - prev.x();
+        if (dx < -threshold) {
+          double spanToRight = right - prev.x();
+          double spanFromLeft = curr.x() - left;
+          double totalSpan = spanToRight + spanFromLeft;
+          if (totalSpan <= 0.0) {
+            pmap.drawLine(prev, curr);
+          } else {
+            double frac = spanToRight / totalSpan;
+            double yEdge = prev.y() + frac * (curr.y() - prev.y());
+            QPointF rightPoint(right, yEdge);
+            QPointF leftPoint(left, yEdge);
+            pmap.drawLine(prev, rightPoint);
+            pmap.drawLine(leftPoint, curr);
+          }
+        } else if (dx > threshold) {
+          double spanToLeft = prev.x() - left;
+          double spanFromRight = right - curr.x();
+          double totalSpan = spanToLeft + spanFromRight;
+          if (totalSpan <= 0.0) {
+            pmap.drawLine(prev, curr);
+          } else {
+            double frac = spanToLeft / totalSpan;
+            double yEdge = prev.y() + frac * (curr.y() - prev.y());
+            QPointF leftPoint(left, yEdge);
+            QPointF rightPoint(right, yEdge);
+            pmap.drawLine(prev, leftPoint);
+            pmap.drawLine(rightPoint, curr);
+          }
+        } else {
+          pmap.drawLine(prev, curr);
+        }
+        prev = curr;
+      }
+    };
+
     auto drawArray = [&](int arrIndex, ArrayData *arr,
       const QVector<double> &vec, const QColor &clr) {
       if (arr->nvals < 1 || vec.size() != arr->nvals)
@@ -794,7 +850,7 @@ protected:
                 tmpPts[i] = QPointF(x, y);
             }
             if (lines)
-              pmap.drawPolyline(tmpPts.constData(), count);
+              drawPolylineWrapped(tmpPts, zoomWrap);
             if (markers) {
               QPen oldPen = pmap.pen();
               QPen markerPen(clr, 3);
@@ -841,7 +897,7 @@ protected:
             tmpPts[i] = QPointF(x, y);
         }
         if (lines)
-          pmap.drawPolyline(tmpPts.constData(), count);
+          drawPolylineWrapped(tmpPts, zoomWrap);
         if (markers) {
           QPen oldPen = pmap.pen();
           QPen markerPen(clr, 3);
