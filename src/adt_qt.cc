@@ -98,6 +98,7 @@ static bool markers = true, lines = true, bars = false, grid = true,
 static int diffSet = -1, displaySet = -1, nsect = 0;
 static QColor displayColor("Grey40");
 static const QColor backgroundColor("#CCCCCC");
+static const QColor filledMinMaxColor(211, 211, 211, 127);
 static double nstat = 0.0, nstatTime = 0.0, stotal = 0.0;
 static QVector<QString> latNames;
 static QVector<double> latS, latLen;
@@ -621,7 +622,7 @@ protected:
             }
             pmap.save();
             pmap.setPen(Qt::NoPen);
-            pmap.setBrush(Qt::lightGray);
+            pmap.setBrush(filledMinMaxColor);
             pmap.drawPolygon(poly.constData(), poly.size());
             pmap.restore();
           } else {
@@ -668,7 +669,7 @@ protected:
             }
             pmap.save();
             pmap.setPen(Qt::NoPen);
-            pmap.setBrush(Qt::lightGray);
+            pmap.setBrush(filledMinMaxColor);
             pmap.drawPolygon(poly.constData(), poly.size());
             pmap.restore();
           } else {
