@@ -2079,6 +2079,7 @@ private:
   int initZoomInterval = 0;
   bool zoomSectorUsed = false;
   bool zoomIntervalUsed = false;
+  int fileZoomInterval = 0;
   QVector<chid> channels;
   QTimer *pollTimer = nullptr;
   int timeInterval = 2000;
@@ -2718,6 +2719,7 @@ private:
     areaWidgets.clear();
     zoomWidget = nullptr;
     zoomAreaWidget = nullptr;
+    fileZoomInterval = 0;
     nstat = 0.0;
     nstatTime = 0.0;
     for (int i = 0; i < NSAVE; ++i) {
@@ -2783,6 +2785,11 @@ private:
         if (SDDS_GetParameterAsLong(&table,
             const_cast<char *>("ADTTimeInterval"), &templong))
           timeInterval = static_cast<int>(templong);
+        if (SDDS_GetParameterAsLong(&table,
+            const_cast<char *>("ADTZoomInterval"), &templong)) {
+          int interval = static_cast<int>(templong);
+          fileZoomInterval = interval > 0 ? interval : 0;
+        }
         if (SDDS_GetParameterAsLong(&table,
             const_cast<char *>("ADTMarkers"), &templong))
           markers = templong != 0;
@@ -3071,7 +3078,7 @@ private:
       zoomPlot = zoomWidget->plotWidget();
       zoomAreaPtr = &zoomArea;
       zoomAreaWidget = zoomWidget;
-      if (!zoomSectorUsed || !zoomIntervalUsed) {
+      if (!zoomSectorUsed || !zoomIntervalUsed || fileZoomInterval > 0) {
         int center = 0;
         int interval = 0;
         if (!zoomSectorUsed && initZoomSector > 0) {
@@ -3081,6 +3088,8 @@ private:
         if (!zoomIntervalUsed && initZoomInterval > 0) {
           interval = initZoomInterval;
           zoomIntervalUsed = true;
+        } else if (fileZoomInterval > 0) {
+          interval = fileZoomInterval;
         }
         if (center > 0 || interval > 0)
           zoomWidget->setZoom(center, interval);
