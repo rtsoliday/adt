@@ -760,7 +760,13 @@ protected:
         return;
       }
       if (!allowWrap) {
-        pmap.drawPolyline(points.constData(), points.size());
+        QPointF prev = points[0];
+        for (int i = 1; i < points.size(); ++i) {
+          QPointF curr = points[i];
+          if (curr.x() >= prev.x())
+            pmap.drawLine(prev, curr);
+          prev = curr;
+        }
         return;
       }
       double width = static_cast<double>(plotRect.width());
