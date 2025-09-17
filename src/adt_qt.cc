@@ -710,6 +710,7 @@ protected:
     double zoomRange = 0.0;
     bool useZoomLimits = false;
     bool zoomWrap = latRing && stotal > 0.0;
+    bool zoomDrawWrap = zoomWrap && nsect > 1;
 
     if (area == zoomAreaPtr && !arrayPtrs.isEmpty()) {
       ArrayData *baseArr = arrayPtrs[0];
@@ -840,7 +841,7 @@ protected:
                 tmpPts[i] = QPointF(x, y);
             }
             if (lines)
-              drawPolylineWrapped(tmpPts, zoomWrap);
+              drawPolylineWrapped(tmpPts, zoomDrawWrap);
             if (markers) {
               QPen oldPen = pmap.pen();
               QPen markerPen(clr, 3);
@@ -887,7 +888,7 @@ protected:
             tmpPts[i] = QPointF(x, y);
         }
         if (lines)
-          drawPolylineWrapped(tmpPts, zoomWrap);
+          drawPolylineWrapped(tmpPts, zoomDrawWrap);
         if (markers) {
           QPen oldPen = pmap.pen();
           QPen markerPen(clr, 3);
