@@ -346,14 +346,19 @@ static void freeSddsStrings(int n, char **p)
  * @param adtHome ADT installation directory.
  * @param pvDirectory Output path for standard PV directory.
  * @param customDirectory Output path for custom PV directory.
+ * @param snapDirectory Output path for snapshot directory.
+ * @param isXorbit True if Xorbit-specific directories should be used when
+ *   provided.
  * @return List of menu items discovered in the file.
  */
 static QList<LoadMenuInfo> readInitFile(const QString &filename,
-  const QString &adtHome, QString &pvDirectory, QString &customDirectory)
+  const QString &adtHome, QString &pvDirectory, QString &customDirectory,
+  QString &snapDirectory, bool isXorbit)
 {
   QList<LoadMenuInfo> menus;
   pvDirectory = adtHome + "/pv";
   customDirectory = pvDirectory;
+  snapDirectory = adtHome + "/snap";
   if (filename.isEmpty())
     return menus;
   SDDS_TABLE table;
@@ -382,6 +387,27 @@ static QList<LoadMenuInfo> readInitFile(const QString &filename,
           customDirectory = adtHome;
         }
         SDDS_Free(subdir);
+      }
+      char *snapdir = NULL;
+      if (SDDS_GetParameter(&table, const_cast<char *>("ADTSnapDirectory"),
+          &snapdir)) {
+        snapDirectory = snapdir;
+        SDDS_Free(snapdir);
+      }
+      if (isXorbit) {
+        char *xpv = NULL;
+        if (SDDS_GetParameter(&table,
+            const_cast<char *>("ADTXPVDirectory"), &xpv)) {
+          pvDirectory = xpv;
+          customDirectory = pvDirectory;
+          SDDS_Free(xpv);
+        }
+        char *xsnap = NULL;
+        if (SDDS_GetParameter(&table,
+            const_cast<char *>("ADTXSnapDirectory"), &xsnap)) {
+          snapDirectory = xsnap;
+          SDDS_Free(xsnap);
+        }
       }
       first = false;
     }
@@ -1910,7 +1936,7 @@ class MainWindow : public QMainWindow
 {
 public:
   explicit MainWindow(const QString &homeOverride, bool homeSpecified,
-    const QString &startupPv, int zoomSect, int zoomInt,
+    const QString &startupPv, int zoomSect, int zoomInt, bool xorbitMode,
     QWidget *parent = nullptr)
     : QMainWindow(parent), initZoomSector(zoomSect), initZoomInterval(zoomInt)
   {
@@ -1944,9 +1970,11 @@ public:
         initFile = QDir(adtHome).filePath(INITFILENAME);
     }
     QString pvDir;
+    QString snapDir;
     QList<LoadMenuInfo> menus = readInitFile(initFile, adtHome, pvDir,
-      customDirectory);
+      customDirectory, snapDir, xorbitMode);
     pvDirectory = pvDir;
+    snapDirectory = snapDir;
     QMenu *loadMenu = fileMenu->addMenu("Load");
     for (const auto &menu : menus) {
       QMenu *sub = loadMenu->addMenu(menu.title);
@@ -2283,6 +2311,7 @@ private:
   QString adtHome;
   QString customDirectory;
   QString pvDirectory;
+  QString snapDirectory;
   QString pvFilename;
   QString latFilename;
   QString refFilename;
@@ -2729,11 +2758,12 @@ private:
     }
     if (n < 1 || n > NSAVE)
       return;
-    QString dir = QDir::currentPath();
+    QString dir = snapDirectory.isEmpty() ? QDir::currentPath() : snapDirectory;
     QString fn = QFileDialog::getOpenFileName(this, "Read Snapshot File", dir,
       "Snapshot Files (*.snap)");
     if (fn.isEmpty())
       return;
+    snapDirectory = QFileInfo(fn).absolutePath();
     if (!readSnapFile(fn, n - 1))
       return;
     resetGraph();
@@ -2816,11 +2846,12 @@ private:
       QMessageBox::warning(this, "ADT", "There are no PV's defined");
       return;
     }
-    QString dir = QDir::currentPath();
+    QString dir = snapDirectory.isEmpty() ? QDir::currentPath() : snapDirectory;
     QString fn = QFileDialog::getOpenFileName(this,
       "Read Reference File", dir, "Snapshot Files (*.snap)");
     if (fn.isEmpty())
       return;
+    snapDirectory = QFileInfo(fn).absolutePath();
     if (!readRefFile(fn)) {
       QMessageBox::warning(this, "ADT",
         "Could not read reference data\nReferencing is inactive");
@@ -2841,11 +2872,12 @@ private:
       QMessageBox::warning(this, "ADT", "There are no PV's defined");
       return;
     }
-    QString dir = QDir::currentPath();
+    QString dir = snapDirectory.isEmpty() ? QDir::currentPath() : snapDirectory;
     QString fn = QFileDialog::getSaveFileName(this, "Write Snapshot File",
       dir, "Snapshot Files (*.snap)");
     if (fn.isEmpty())
       return;
+    snapDirectory = QFileInfo(fn).absolutePath();
     writeSnapFile(fn);
   }
 
@@ -2858,11 +2890,12 @@ private:
     if (n < 1 || n > NSAVE)
       return;
     int idx = n - 1;
-    QString dir = QDir::currentPath();
+    QString dir = snapDirectory.isEmpty() ? QDir::currentPath() : snapDirectory;
     QString fn = QFileDialog::getSaveFileName(this, "Write Snapshot File",
       dir, "Snapshot Files (*.snap)");
     if (fn.isEmpty())
       return;
+    snapDirectory = QFileInfo(fn).absolutePath();
     writeSnapFile(fn, idx);
   }
 
@@ -2955,6 +2988,7 @@ private:
     }
     refFilename.clear();
     referenceLoaded = false;
+    QString pendingReferenceFile;
 
     if (ca_context_create(ca_disable_preemptive_callback) != ECA_NORMAL) {
       QMessageBox::warning(this, "ADT", "Unable to start Channel Access");
@@ -3057,6 +3091,22 @@ private:
           latLen.clear();
           latHeight.clear();
           latRing = false;
+        }
+        char *reffile = NULL;
+        if (SDDS_GetParameter(&table,
+            const_cast<char *>("ADTReferenceFile"), &reffile)) {
+          QString rf = reffile;
+          if (!rf.isEmpty()) {
+            if (!QDir::isAbsolutePath(rf)) {
+              QString baseDir = snapDirectory.isEmpty() ?
+                QDir::currentPath() : snapDirectory;
+              rf = QDir(baseDir).filePath(rf);
+            }
+            pendingReferenceFile = rf;
+          } else {
+            pendingReferenceFile.clear();
+          }
+          SDDS_Free(reffile);
         }
         first = false;
       }
@@ -3324,6 +3374,17 @@ private:
     }
     setCentralWidget(central);
 
+    if (!pendingReferenceFile.isEmpty()) {
+      if (readRefFile(pendingReferenceFile)) {
+        referenceLoaded = true;
+        refFilename = pendingReferenceFile;
+        resetGraph();
+      } else {
+        referenceLoaded = false;
+        refFilename.clear();
+      }
+    }
+
     setWindowTitle("ADT - " + QFileInfo(file).fileName());
     pollTimer->start(timeInterval);
   }
@@ -3331,12 +3392,13 @@ private:
 
 static void usage(const char *prog) {
   fprintf(stderr,
-    "Usage: %s [-a directory] [-f pvfile] [-s center_sector] [-z number_of_sectors] [-d] [-h|-?]\n"
+    "Usage: %s [-a directory] [-f pvfile] [-s center_sector] [-z number_of_sectors] [-d] [-x] [-h|-?]\n"
     "  -a <directory>          specify ADT home directory\n"
     "  -f <file>               open PV file at startup\n"
     "  -s <center_sector>      set initial zoomed on sector\n"
     "  -z <number_of_sectors>  set initial zoom range\n"
     "  -d                      enable diff mode\n"
+    "  -x                      use Xorbit directories\n"
     "  -h, -?                  show this help message and exit\n",
     prog);
 }
@@ -3350,6 +3412,7 @@ int main(int argc, char **argv)
   int zoomSect = 0;
   int zoomInt = 0;
   bool diffMode = false;
+  bool xorbitMode = false;
   bool showHelp = false;
   QStringList args = app.arguments();
   for (int i = 1; i < args.size(); ++i) {
@@ -3365,6 +3428,8 @@ int main(int argc, char **argv)
       zoomInt = args.at(++i).toInt();
     } else if (arg == "-d" || arg == "/d") {
       diffMode = true;
+    } else if (arg == "-x" || arg == "/x") {
+      xorbitMode = true;
     } else if (arg == "-h" || arg == "/h" || arg == "-?" || arg == "/?") {
       showHelp = true;
     }
@@ -3373,7 +3438,8 @@ int main(int argc, char **argv)
     usage(argv[0]);
     return 0;
   }
-  MainWindow win(homeOverride, homeSpecified, startPv, zoomSect, zoomInt);
+  MainWindow win(homeOverride, homeSpecified, startPv, zoomSect, zoomInt,
+    xorbitMode);
   win.show();
   if (diffMode)
     QTimer::singleShot(1000, &win, [&win]() { win.storeSet(1); win.diffSet(1); });
