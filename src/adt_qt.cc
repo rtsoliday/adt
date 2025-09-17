@@ -640,176 +640,53 @@ protected:
       zoomLimits.size() == arrayPtrs.size();
     double zoomXScale = applyZoomLimits ? plotRect.width() / zoomRange : 0.0;
 
-    if (showmaxmin) {
+    if (showmaxmin && area != zoomAreaPtr) {
       for (int arrIndex = 0; arrIndex < arrayPtrs.size(); ++arrIndex) {
         auto arr = arrayPtrs[arrIndex];
         if (arr->nvals < 1 || arr->minVals.size() != arr->nvals ||
             arr->maxVals.size() != arr->nvals)
           continue;
-        if (area == zoomAreaPtr) {
-          int nvals = arr->nvals;
-          bool drewZoom = false;
-          if (applyZoomLimits && arrIndex >= 0 &&
-              arrIndex < zoomLimits.size() && arr->s.size() == nvals &&
-              zoomXScale > 0.0) {
-            ZoomLimit limit = zoomLimits[arrIndex];
-            int count = limit.max - limit.min + 1;
-            if (count > 0) {
-              auto makePoint = [&](int offset, const QVector<double> &vec)
-                -> QPointF
-              {
-                int idx = limit.min + offset;
-                int wrapped = idx;
-                double soff = 0.0;
-                while (wrapped >= nvals) {
-                  wrapped -= nvals;
-                  soff += stotal;
-                }
-                while (wrapped < 0) {
-                  wrapped += nvals;
-                  soff -= stotal;
-                }
-                double sval = arr->s[wrapped] + soff;
-                if (zoomWrap) {
-                  while (sval < zoomSmin)
-                    sval += stotal;
-                  while (sval > zoomSmax)
-                    sval -= stotal;
-                }
-                double x = plotRect.left() + (sval - zoomSmin) * zoomXScale;
-                return QPointF(x, mapY(diffVal(arr, vec, wrapped)));
-              };
-              if (fillmaxmin) {
-                QVector<QPointF> poly(2 * count);
-                for (int i = 0; i < count; ++i)
-                  poly[i] = makePoint(i, arr->minVals);
-                for (int i = 0; i < count; ++i)
-                  poly[count + i] = makePoint(count - 1 - i, arr->maxVals);
-                pmap.save();
-                pmap.setPen(Qt::NoPen);
-                pmap.setBrush(filledMinMaxColor);
-                pmap.drawPolygon(poly.constData(), poly.size());
-                pmap.restore();
-              } else {
-                pmap.setPen(arr->color);
-                tmpPts.resize(count);
-                for (int i = 0; i < count; ++i)
-                  tmpPts[i] = makePoint(i, arr->minVals);
-                pmap.drawPolyline(tmpPts.constData(), count);
-                for (int i = 0; i < count; ++i)
-                  tmpPts[i] = makePoint(i, arr->maxVals);
-                pmap.drawPolyline(tmpPts.constData(), count);
-                pmap.setPen(Qt::black);
-              }
-              drewZoom = true;
-            }
+        int start = area->xStart;
+        int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
+        if (start < 0)
+          start = 0;
+        if (end > arr->nvals)
+          end = arr->nvals;
+        int count = end - start;
+        if (count < 1)
+          continue;
+        double xstep = plotRect.width() /
+          static_cast<double>(count);
+        double xstart = plotRect.left() + xstep / 2.0;
+        if (fillmaxmin) {
+          QVector<QPointF> poly(2 * count);
+          for (int i = 0; i < count; ++i) {
+            int idx = start + i;
+            poly[i] = QPointF(xstart + i * xstep,
+              mapY(diffVal(arr, arr->minVals, idx)));
           }
-          if (drewZoom)
-            continue;
-          if (arr->s.size() != nvals)
-            continue;
-          int start = wrapIndex(area->xStart, nvals);
-          int end = wrapIndex(area->xEnd, nvals);
-          int count = (end >= start) ?
-            (end - start + 1) : (nvals - start + end + 1);
-          if (count < 1)
-            continue;
-          double smin = 0.0;
-          double smax = 0.0;
-          if (count >= nvals && stotal > 0.0) {
-            smin = 0.0;
-            smax = stotal;
-          } else {
-            smin = arr->s[start];
-            smax = arr->s[end] + (end < start ? stotal : 0.0);
+          for (int i = 0; i < count; ++i) {
+            int idx = start + count - 1 - i;
+            poly[count + i] = QPointF(xstart + (count - 1 - i) * xstep,
+              mapY(diffVal(arr, arr->maxVals, idx)));
           }
-          double range = smax - smin;
-          if (range <= 0.0)
-            continue;
-          auto xpos = [&](int idx) {
-            double sval = arr->s[idx];
-            if (count < nvals && idx < start)
-              sval += stotal;
-            double frac = (sval - smin) / range;
-            return plotRect.left() + frac * plotRect.width();
-          };
-          if (fillmaxmin) {
-            QVector<QPointF> poly(2 * count);
-            for (int i = 0; i < count; ++i) {
-              int idx = (start + i) % nvals;
-              poly[i] = QPointF(xpos(idx),
-                mapY(diffVal(arr, arr->minVals, idx)));
-            }
-            for (int i = 0; i < count; ++i) {
-              int idx = (start + count - 1 - i) % nvals;
-              poly[count + i] = QPointF(xpos(idx),
-                mapY(diffVal(arr, arr->maxVals, idx)));
-            }
-            pmap.save();
-            pmap.setPen(Qt::NoPen);
-            pmap.setBrush(filledMinMaxColor);
-            pmap.drawPolygon(poly.constData(), poly.size());
-            pmap.restore();
-          } else {
-            pmap.setPen(arr->color);
-            tmpPts.resize(count);
-            for (int i = 0; i < count; ++i) {
-              int idx = (start + i) % nvals;
-              tmpPts[i] = QPointF(xpos(idx),
-                mapY(diffVal(arr, arr->minVals, idx)));
-            }
-            pmap.drawPolyline(tmpPts.constData(), count);
-            for (int i = 0; i < count; ++i) {
-              int idx = (start + i) % nvals;
-              tmpPts[i] = QPointF(xpos(idx),
-                mapY(diffVal(arr, arr->maxVals, idx)));
-            }
-            pmap.drawPolyline(tmpPts.constData(), count);
-            pmap.setPen(Qt::black);
-          }
+          pmap.save();
+          pmap.setPen(Qt::NoPen);
+          pmap.setBrush(filledMinMaxColor);
+          pmap.drawPolygon(poly.constData(), poly.size());
+          pmap.restore();
         } else {
-          int start = area->xStart;
-          int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
-          if (start < 0)
-            start = 0;
-          if (end > arr->nvals)
-            end = arr->nvals;
-          int count = end - start;
-          if (count < 1)
-            continue;
-          double xstep = plotRect.width() /
-            static_cast<double>(count);
-          double xstart = plotRect.left() + xstep / 2.0;
-          if (fillmaxmin) {
-            QVector<QPointF> poly(2 * count);
-            for (int i = 0; i < count; ++i) {
-              int idx = start + i;
-              poly[i] = QPointF(xstart + i * xstep,
-                mapY(diffVal(arr, arr->minVals, idx)));
-            }
-            for (int i = 0; i < count; ++i) {
-              int idx = start + count - 1 - i;
-              poly[count + i] = QPointF(xstart + (count - 1 - i) * xstep,
-                mapY(diffVal(arr, arr->maxVals, idx)));
-            }
-            pmap.save();
-            pmap.setPen(Qt::NoPen);
-            pmap.setBrush(filledMinMaxColor);
-            pmap.drawPolygon(poly.constData(), poly.size());
-            pmap.restore();
-          } else {
-            pmap.setPen(arr->color);
-            tmpPts.resize(count);
-            for (int i = start; i < end; ++i)
-              tmpPts[i - start] = QPointF(xstart + (i - start) * xstep,
-                mapY(diffVal(arr, arr->minVals, i)));
-            pmap.drawPolyline(tmpPts.constData(), count);
-            for (int i = start; i < end; ++i)
-              tmpPts[i - start] = QPointF(xstart + (i - start) * xstep,
-                mapY(diffVal(arr, arr->maxVals, i)));
-            pmap.drawPolyline(tmpPts.constData(), count);
-            pmap.setPen(Qt::black);
-          }
+          pmap.setPen(arr->color);
+          tmpPts.resize(count);
+          for (int i = start; i < end; ++i)
+            tmpPts[i - start] = QPointF(xstart + (i - start) * xstep,
+              mapY(diffVal(arr, arr->minVals, i)));
+          pmap.drawPolyline(tmpPts.constData(), count);
+          for (int i = start; i < end; ++i)
+            tmpPts[i - start] = QPointF(xstart + (i - start) * xstep,
+              mapY(diffVal(arr, arr->maxVals, i)));
+          pmap.drawPolyline(tmpPts.constData(), count);
+          pmap.setPen(Qt::black);
         }
       }
     }
