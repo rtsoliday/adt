@@ -788,24 +788,13 @@ protected:
             pmap.drawLine(prev, rightPoint);
             pmap.drawLine(leftPoint, curr);
           }
-        } else if (dx > threshold) {
-          double spanToLeft = prev.x() - left;
-          double spanFromRight = right - curr.x();
-          double totalSpan = spanToLeft + spanFromRight;
-          if (totalSpan <= 0.0) {
-            pmap.drawLine(prev, curr);
-          } else {
-            double frac = spanToLeft / totalSpan;
-            double yEdge = prev.y() + frac * (curr.y() - prev.y());
-            QPointF leftPoint(left, yEdge);
-            QPointF rightPoint(right, yEdge);
-            pmap.drawLine(prev, leftPoint);
-            pmap.drawLine(rightPoint, curr);
-          }
         } else {
           pmap.drawLine(prev, curr);
         }
         prev = curr;
+        if (curr.x() == width) {
+          break;
+        }
       }
     };
 
