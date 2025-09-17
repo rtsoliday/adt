@@ -585,25 +585,150 @@ protected:
 
     int y0 = mapY(area->centerVal);
 
+    struct ZoomLimit
+    {
+      int min = 0;
+      int max = -1;
+    };
+    QVector<ZoomLimit> zoomLimits;
+    double zoomSmin = 0.0;
+    double zoomSmax = 0.0;
+    double zoomRange = 0.0;
+    bool useZoomLimits = false;
+    bool zoomWrap = latRing && stotal > 0.0;
+    bool zoomDrawWrap = zoomWrap && nsect > 1;
+
+    if (area == zoomAreaPtr && !arrayPtrs.isEmpty()) {
+      ArrayData *baseArr = arrayPtrs[0];
+      int baseN = baseArr->nvals;
+      if (baseN > 0 && baseArr->s.size() == baseN) {
+        int baseStart = wrapIndex(area->xStart, baseN);
+        int baseEnd = wrapIndex(area->xEnd, baseN);
+        int span = (baseEnd >= baseStart) ?
+          (baseEnd - baseStart + 1) : (baseN - baseStart + baseEnd + 1);
+        if (span >= baseN && stotal > 0.0) {
+          zoomSmin = 0.0;
+          zoomSmax = stotal;
+        } else {
+          zoomSmin = baseArr->s[baseStart];
+          zoomSmax = baseArr->s[baseEnd] + (baseEnd < baseStart ? stotal : 0.0);
+        }
+        zoomRange = zoomSmax - zoomSmin;
+        if (zoomRange <= 0.0 && zoomWrap)
+          zoomRange = stotal;
+        if (zoomRange > 0.0) {
+          useZoomLimits = true;
+          zoomLimits.resize(arrayPtrs.size());
+          for (int i = 0; i < arrayPtrs.size(); ++i) {
+            auto arr = arrayPtrs[i];
+            ZoomLimit limit;
+            if (arr->nvals > 0 && arr->s.size() == arr->nvals) {
+              if (zoomWrap)
+                indexLimits(zoomSmin, zoomSmax, arr->s, limit.min, limit.max);
+              else {
+                limit.min = 0;
+                limit.max = arr->nvals - 1;
+              }
+            }
+            zoomLimits[i] = limit;
+          }
+        }
+      }
+    }
+
+    bool applyZoomLimits = useZoomLimits && zoomRange > 0.0 &&
+      zoomLimits.size() == arrayPtrs.size();
+    double zoomXScale = applyZoomLimits ? plotRect.width() / zoomRange : 0.0;
+
     if (showmaxmin) {
-      for (auto arr : arrayPtrs) {
+      for (int arrIndex = 0; arrIndex < arrayPtrs.size(); ++arrIndex) {
+        auto arr = arrayPtrs[arrIndex];
         if (arr->nvals < 1 || arr->minVals.size() != arr->nvals ||
             arr->maxVals.size() != arr->nvals)
           continue;
         if (area == zoomAreaPtr) {
           int nvals = arr->nvals;
+          bool drewZoom = false;
+          if (applyZoomLimits && arrIndex >= 0 &&
+              arrIndex < zoomLimits.size() && arr->s.size() == nvals &&
+              zoomXScale > 0.0) {
+            ZoomLimit limit = zoomLimits[arrIndex];
+            int count = limit.max - limit.min + 1;
+            if (count > 0) {
+              auto makePoint = [&](int offset, const QVector<double> &vec)
+                -> QPointF
+              {
+                int idx = limit.min + offset;
+                int wrapped = idx;
+                double soff = 0.0;
+                while (wrapped >= nvals) {
+                  wrapped -= nvals;
+                  soff += stotal;
+                }
+                while (wrapped < 0) {
+                  wrapped += nvals;
+                  soff -= stotal;
+                }
+                double sval = arr->s[wrapped] + soff;
+                if (zoomWrap) {
+                  while (sval < zoomSmin)
+                    sval += stotal;
+                  while (sval > zoomSmax)
+                    sval -= stotal;
+                }
+                double x = plotRect.left() + (sval - zoomSmin) * zoomXScale;
+                return QPointF(x, mapY(diffVal(arr, vec, wrapped)));
+              };
+              if (fillmaxmin) {
+                QVector<QPointF> poly(2 * count);
+                for (int i = 0; i < count; ++i)
+                  poly[i] = makePoint(i, arr->minVals);
+                for (int i = 0; i < count; ++i)
+                  poly[count + i] = makePoint(count - 1 - i, arr->maxVals);
+                pmap.save();
+                pmap.setPen(Qt::NoPen);
+                pmap.setBrush(filledMinMaxColor);
+                pmap.drawPolygon(poly.constData(), poly.size());
+                pmap.restore();
+              } else {
+                pmap.setPen(arr->color);
+                tmpPts.resize(count);
+                for (int i = 0; i < count; ++i)
+                  tmpPts[i] = makePoint(i, arr->minVals);
+                pmap.drawPolyline(tmpPts.constData(), count);
+                for (int i = 0; i < count; ++i)
+                  tmpPts[i] = makePoint(i, arr->maxVals);
+                pmap.drawPolyline(tmpPts.constData(), count);
+                pmap.setPen(Qt::black);
+              }
+              drewZoom = true;
+            }
+          }
+          if (drewZoom)
+            continue;
+          if (arr->s.size() != nvals)
+            continue;
           int start = wrapIndex(area->xStart, nvals);
           int end = wrapIndex(area->xEnd, nvals);
           int count = (end >= start) ?
             (end - start + 1) : (nvals - start + end + 1);
           if (count < 1)
             continue;
-          double smin = arr->s[start];
-          double smax = arr->s[end] + (end < start ? stotal : 0.0);
+          double smin = 0.0;
+          double smax = 0.0;
+          if (count >= nvals && stotal > 0.0) {
+            smin = 0.0;
+            smax = stotal;
+          } else {
+            smin = arr->s[start];
+            smax = arr->s[end] + (end < start ? stotal : 0.0);
+          }
           double range = smax - smin;
+          if (range <= 0.0)
+            continue;
           auto xpos = [&](int idx) {
             double sval = arr->s[idx];
-            if (idx < start)
+            if (count < nvals && idx < start)
               sval += stotal;
             double frac = (sval - smin) / range;
             return plotRect.left() + frac * plotRect.width();
@@ -698,61 +823,6 @@ protected:
       pw.drawPixmap(0, 0, pixmap);
       return;
     }
-
-    struct ZoomLimit
-    {
-      int min = 0;
-      int max = -1;
-    };
-    QVector<ZoomLimit> zoomLimits;
-    double zoomSmin = 0.0;
-    double zoomSmax = 0.0;
-    double zoomRange = 0.0;
-    bool useZoomLimits = false;
-    bool zoomWrap = latRing && stotal > 0.0;
-    bool zoomDrawWrap = zoomWrap && nsect > 1;
-
-    if (area == zoomAreaPtr && !arrayPtrs.isEmpty()) {
-      ArrayData *baseArr = arrayPtrs[0];
-      int baseN = baseArr->nvals;
-      if (baseN > 0 && baseArr->s.size() == baseN) {
-        int baseStart = wrapIndex(area->xStart, baseN);
-        int baseEnd = wrapIndex(area->xEnd, baseN);
-        int span = (baseEnd >= baseStart) ?
-          (baseEnd - baseStart + 1) : (baseN - baseStart + baseEnd + 1);
-        if (span >= baseN && stotal > 0.0) {
-          zoomSmin = 0.0;
-          zoomSmax = stotal;
-        } else {
-          zoomSmin = baseArr->s[baseStart];
-          zoomSmax = baseArr->s[baseEnd] + (baseEnd < baseStart ? stotal : 0.0);
-        }
-        zoomRange = zoomSmax - zoomSmin;
-        if (zoomRange <= 0.0 && zoomWrap)
-          zoomRange = stotal;
-        if (zoomRange > 0.0) {
-          useZoomLimits = true;
-          zoomLimits.resize(arrayPtrs.size());
-          for (int i = 0; i < arrayPtrs.size(); ++i) {
-            auto arr = arrayPtrs[i];
-            ZoomLimit limit;
-            if (arr->nvals > 0 && arr->s.size() == arr->nvals) {
-              if (zoomWrap)
-                indexLimits(zoomSmin, zoomSmax, arr->s, limit.min, limit.max);
-              else {
-                limit.min = 0;
-                limit.max = arr->nvals - 1;
-              }
-            }
-            zoomLimits[i] = limit;
-          }
-        }
-      }
-    }
-
-    bool applyZoomLimits = useZoomLimits && zoomRange > 0.0 &&
-      zoomLimits.size() == arrayPtrs.size();
-    double zoomXScale = applyZoomLimits ? plotRect.width() / zoomRange : 0.0;
 
     auto drawPolylineWrapped = [&](const QVector<QPointF> &points,
       bool allowWrap) {
