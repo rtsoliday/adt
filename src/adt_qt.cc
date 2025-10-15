@@ -1114,27 +1114,107 @@ protected:
           QWidget::mousePressEvent(event);
           return;
         }
-        int nvals = arrayPtrs[0]->nvals;
-        if (nvals < 1) {
+        auto sourceArr = arrayPtrs[0];
+        if (!sourceArr || sourceArr->nvals < 1) {
           QWidget::mousePressEvent(event);
           return;
         }
-        double xstep = nvals > 1 ? plotRect.width() /
-          static_cast<double>(nvals - 1) : 0.0;
-        int idx = static_cast<int>((event->pos().x() - plotRect.left()) /
-          xstep + 0.5);
+        if (!zoomPlot || zoomPlot->arrayPtrs.isEmpty()) {
+          QWidget::mousePressEvent(event);
+          return;
+        }
+        auto zoomBase = zoomPlot->arrayPtrs[0];
+        if (!zoomBase || zoomBase->nvals < 1) {
+          QWidget::mousePressEvent(event);
+          return;
+        }
+        int nvals = sourceArr->nvals;
+        int startIdx = area->xStart;
+        int endIdx = area->xEnd >= area->xStart ? area->xEnd + 1 : nvals;
+        if (startIdx < 0)
+          startIdx = 0;
+        if (endIdx > nvals)
+          endIdx = nvals;
+        int count = endIdx - startIdx;
+        if (count < 1) {
+          QWidget::mousePressEvent(event);
+          return;
+        }
+        double xstep = count > 0 ? plotRect.width() /
+          static_cast<double>(count) : 0.0;
+        double xpos = event->pos().x();
+        double xstart = plotRect.left() + xstep / 2.0;
+        int offset = 0;
+        if (xstep > 0.0)
+          offset = static_cast<int>(std::round((xpos - xstart) / xstep));
+        int idx = startIdx + offset;
+        if (idx < startIdx)
+          idx = startIdx;
+        if (idx >= endIdx)
+          idx = endIdx - 1;
+        if (idx < 0 || idx >= nvals) {
+          QWidget::mousePressEvent(event);
+          return;
+        }
+
+        int zoomNvals = zoomBase->nvals;
         int span = (zoomAreaPtr->xEnd >= zoomAreaPtr->xStart) ?
           (zoomAreaPtr->xEnd - zoomAreaPtr->xStart + 1) :
-          (nvals - zoomAreaPtr->xStart + zoomAreaPtr->xEnd + 1);
+          (zoomNvals - zoomAreaPtr->xStart + zoomAreaPtr->xEnd + 1);
         if (span < 1)
           span = 1;
+        if (span > zoomNvals)
+          span = zoomNvals;
+
+        auto normalizeS = [](double s) {
+          if (stotal <= 0.0)
+            return s;
+          double val = std::fmod(s, stotal);
+          if (val < 0.0)
+            val += stotal;
+          return val;
+        };
+
+        int target = 0;
+        bool haveSourceS = sourceArr->s.size() == sourceArr->nvals;
+        bool haveZoomS = zoomBase->s.size() == zoomBase->nvals;
+        if (haveSourceS && haveZoomS) {
+          double targetS = normalizeS(sourceArr->s[idx]);
+          double best = std::numeric_limits<double>::max();
+          for (int i = 0; i < zoomNvals; ++i) {
+            double zs = normalizeS(zoomBase->s[i]);
+            double diff = std::fabs(zs - targetS);
+            if (stotal > 0.0)
+              diff = std::min(diff, stotal - diff);
+            if (diff < best) {
+              best = diff;
+              target = i;
+            }
+          }
+        } else {
+          double frac = (count > 1) ?
+            static_cast<double>(idx - startIdx) /
+            static_cast<double>(count - 1) : 0.0;
+          if (frac < 0.0)
+            frac = 0.0;
+          if (frac > 1.0)
+            frac = 1.0;
+          target = static_cast<int>(std::round(frac * (zoomNvals - 1)));
+        }
+
+        if (target < 0)
+          target = 0;
+        if (target >= zoomNvals)
+          target = zoomNvals - 1;
+
         int half = span / 2;
-        int start = wrapIndex(idx - half, nvals);
-        int end = wrapIndex(start + span - 1, nvals);
+        int start = wrapIndex(target - half, zoomNvals);
+        int end = wrapIndex(start + span - 1, zoomNvals);
         zoomAreaPtr->xStart = start;
         zoomAreaPtr->xEnd = end;
         zoomPlot->update();
         updateZoomCenter();
+        updateZoomInterval();
       } else {
         QWidget::mousePressEvent(event);
       }
