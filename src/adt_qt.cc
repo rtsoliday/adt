@@ -1549,7 +1549,6 @@ public:
           int interval = intervalSpin ? intervalSpin->value() : 1;
           applySectorSelection(val, interval);
           schedulePlotUpdate();
-          updateCenterSectSpin();
           updateIntervalSpin();
           return;
         }
@@ -1580,7 +1579,6 @@ public:
         area->xStart = start;
         area->xEnd = end;
         schedulePlotUpdate();
-        updateCenterSectSpin();
       });
       updateCenterSectSpin();
       updateIntervalSpin();
@@ -1607,32 +1605,34 @@ public:
   {
     if (!centerSectSpin || arrayPtrs.isEmpty())
       return;
-    if (hasSectorControls()) {
-      double smin = 0.0;
-      double smax = 0.0;
-      int span = 0;
-      if (!computeAbsoluteRange(smin, smax, span))
-        return;
-      int sect = computeCenterSector(smin, smax);
-      centerSectSpin->blockSignals(true);
-      centerSectSpin->setValue(sect);
-      centerSectSpin->blockSignals(false);
-      return;
-    }
     if (nsect <= 0 || stotal <= 0.0)
       return;
     auto arr = arrayPtrs[0];
-    if (arr->nvals < 1 || arr->s.size() != arr->nvals)
+    if (!arr || arr->nvals < 1 || arr->s.size() != arr->nvals)
       return;
     int nvals = arr->nvals;
+    double sectLen = stotal / nsect;
+    if (sectLen <= 0.0)
+      return;
     int span = (area->xEnd >= area->xStart) ?
       (area->xEnd - area->xStart + 1) :
       (nvals - area->xStart + area->xEnd + 1);
-    int center = (area->xStart + span / 2) % nvals;
-    double s = std::fmod(arr->s[center], stotal);
-    if (s < 0)
-      s += stotal;
-    int sect = static_cast<int>((s * nsect) / stotal) + 1;
+    int midIdx = wrapIndex(area->xStart + span / 2, nvals);
+    double s = arr->s[midIdx];
+    if (s <= 0.0) {
+      for (int off = 1; off <= span / 2; ++off) {
+        int up = wrapIndex(midIdx + off, nvals);
+        if (arr->s[up] > 0.0) { s = arr->s[up]; break; }
+        int dn = wrapIndex(midIdx - off, nvals);
+        if (arr->s[dn] > 0.0) { s = arr->s[dn]; break; }
+      }
+    }
+    double norm = normalizeS(s);
+    int sect = static_cast<int>(norm / sectLen) + 1;
+    if (sect < 1)
+      sect = 1;
+    else if (sect > nsect)
+      sect = nsect;
     centerSectSpin->blockSignals(true);
     centerSectSpin->setValue(sect);
     centerSectSpin->blockSignals(false);
@@ -1645,18 +1645,6 @@ public:
     intervalSpin->setEnabled(nsect > 1);
     if (arrayPtrs.isEmpty())
       return;
-    if (hasSectorControls()) {
-      double smin = 0.0;
-      double smax = 0.0;
-      int span = 0;
-      if (!computeAbsoluteRange(smin, smax, span))
-        return;
-      int val = computeVisibleSectors(smin, smax);
-      intervalSpin->blockSignals(true);
-      intervalSpin->setValue(val);
-      intervalSpin->blockSignals(false);
-      return;
-    }
     int nvals = arrayPtrs[0]->nvals;
     if (nvals < 1)
       return;
@@ -1665,6 +1653,10 @@ public:
       (nvals - area->xStart + area->xEnd + 1);
     int perSect = nsect > 0 ? std::max(1, nvals / nsect) : nvals;
     int val = (span + perSect - 1) / perSect;
+    if (val < 1)
+      val = 1;
+    if (val > nsect)
+      val = nsect;
     intervalSpin->blockSignals(true);
     intervalSpin->setValue(val);
     intervalSpin->blockSignals(false);
@@ -1863,93 +1855,19 @@ private:
     }
     double centerS = normalizeS((clampedCenter - 0.5) * sectLen);
     if (clampedInterval >= nsect) {
-      int span = nvals;
-      int centerIndex = findIndexNearS(centerS);
-      int startIndex = wrapIndex(centerIndex - span / 2, nvals);
-      int endIndex = wrapIndex(startIndex + span - 1, nvals);
-      area->xStart = startIndex;
-      area->xEnd = endIndex;
+      area->xStart = 0;
+      area->xEnd = nvals - 1;
       return;
     }
-    double halfSpan = 0.5 * clampedInterval * sectLen;
-    double smin = centerS - halfSpan;
-    double smax = centerS + halfSpan;
-    int imin = 0;
-    int imax = 0;
-    indexLimits(smin, smax, arr->s, imin, imax);
-    int count = imax - imin + 1;
-    if (count <= 0)
-      count = nvals;
-    if (count > nvals)
-      count = nvals;
-
-    auto computeRange = [&](int start, int span, double &outMin,
-      double &outMax) -> bool
-    {
-      if (span <= 0)
-        return false;
-      if (arr->s.size() != nvals)
-        return false;
-      int startWrapped = wrapIndex(start, nvals);
-      outMin = arr->s[startWrapped];
-      if (span == 1) {
-        outMax = outMin;
-        return true;
-      }
-      double prev = outMin;
-      double offset = 0.0;
-      for (int i = 1; i < span; ++i) {
-        int idx = wrapIndex(start + i, nvals);
-        double current = arr->s[idx];
-        if (current < prev)
-          offset += stotal;
-        prev = current;
-        if (i == span - 1)
-          outMax = current + offset;
-      }
-      if (span >= nvals && stotal > 0.0 && outMax < outMin + stotal)
-        outMax = outMin + stotal;
-      return true;
-    };
-
-    auto visibleForRange = [&](int start, int span, double &outMin,
-      double &outMax) -> int
-    {
-      if (!computeRange(start, span, outMin, outMax))
-        return 1;
-      return computeVisibleSectors(outMin, outMax);
-    };
-
-    double rangeMin = 0.0;
-    double rangeMax = 0.0;
-    int currentVisible = visibleForRange(imin, count, rangeMin, rangeMax);
-    while (currentVisible > clampedInterval && count > 1) {
-      double leftMin = rangeMin;
-      double leftMax = rangeMax;
-      int leftVisible = currentVisible;
-      if (count > 1)
-        leftVisible = visibleForRange(imin + 1, count - 1, leftMin, leftMax);
-      double rightMin = rangeMin;
-      double rightMax = rangeMax;
-      int rightVisible = currentVisible;
-      if (count > 1)
-        rightVisible = visibleForRange(imin, count - 1, rightMin, rightMax);
-      if (leftVisible <= rightVisible) {
-        ++imin;
-        --count;
-        rangeMin = leftMin;
-        rangeMax = leftMax;
-        currentVisible = leftVisible;
-      } else {
-        --count;
-        rangeMin = rightMin;
-        rangeMax = rightMax;
-        currentVisible = rightVisible;
-      }
-    }
-
-    int startIndex = wrapIndex(imin, nvals);
-    int endIndex = wrapIndex(imin + count - 1, nvals);
+    int centerIndex = findIndexNearS(centerS);
+    int perSect = std::max(1, nvals / nsect);
+    int span = perSect * clampedInterval;
+    if (span > nvals)
+      span = nvals;
+    if (span < 1)
+      span = 1;
+    int startIndex = wrapIndex(centerIndex - span / 2, nvals);
+    int endIndex = wrapIndex(startIndex + span - 1, nvals);
     area->xStart = startIndex;
     area->xEnd = endIndex;
   }
