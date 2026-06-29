@@ -50,10 +50,10 @@ void eventgraph(Widget w,  XtPointer clientdata, XEvent *event,
 			val=array->scalefactor*array->vals[nmid1];
 			if(arrays->logscale) val=val > 0.?log10(val):0.;
 			if(nmid1 == nmid)
-			  sprintf(ptr,"->%d %s  % 7.3f\n",nmid1+1,array->names[nmid1],
+			  sprintf(ptr,"->%d %s  % #11.4g\n",nmid1+1,array->names[nmid1],
 			    val);
 			else
-			  sprintf(ptr,"  %d %s  % 7.3f\n",nmid1+1,array->names[nmid1],
+			  sprintf(ptr,"  %d %s  % #11.4g\n",nmid1+1,array->names[nmid1],
 			    val);
 			ptr=string+strlen(string);
 		    }

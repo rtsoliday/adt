@@ -166,6 +166,20 @@ static void updateZoomCenter();
 static void updateZoomInterval();
 static void getCallback(struct event_handler_args args);
 
+/**
+ * @brief Format a PV value for point detail popups.
+ *
+ * Significant digits preserve very small values such as vacuum pressures that
+ * fixed decimal formatting would round to zero.
+ *
+ * @param value Value to format.
+ * @return Compact display string.
+ */
+static QString formatPvValue(double value)
+{
+  return QString::number(value, 'g', 4);
+}
+
 struct LoadItem
 {
   QString label;
@@ -1077,7 +1091,7 @@ protected:
             .arg(idx == nmid ? "->" : "  ")
             .arg(idx + 1)
             .arg(arr->names[idx])
-            .arg(val, 7, 'f', 3);
+            .arg(formatPvValue(val), 11);
           info += line;
         }
       }
