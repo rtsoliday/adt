@@ -51,7 +51,7 @@ This supplement is generated from repository evidence and leaves the handwritten
 - `src/adt.c`: Source file named after the repository
 
 ## Build and test
-- Documented setup/build commands: `invoke MOTIF=1 make.`, `make`.
+- Documented setup/build commands: `make` (Qt default), `MOTIF=1 make` (legacy Motif/X11).
 - Detected build systems: GNU Make.
 - Unknown: no test workflow evidence was found in the inspected files.
 - Likely run commands or operator entry points: `./bin/Linux-x86_64/adt -f pv/sr.bpm.pv`.
