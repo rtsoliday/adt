@@ -22,6 +22,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFile>
+#include <QSaveFile>
 #include <QFont>
 #include <QFontDatabase>
 #include <QByteArray>
@@ -349,6 +350,40 @@ static void freeSddsStrings(int n, char **p)
   for (int i = 0; i < n; ++i)
     SDDS_Free(p[i]);
   SDDS_Free(p);
+}
+
+/**
+ * @brief Commit a completed export without truncating an existing destination.
+ *
+ * Closes the temporary stream on every path. QSaveFile discards incomplete
+ * output if a read, write, or commit fails.
+ */
+static bool commitExport(FILE *file, const QString &filename)
+{
+  bool ok = !ferror(file) && fflush(file) == 0 && fseek(file, 0, SEEK_SET) == 0;
+  QSaveFile output(filename);
+  if (ok)
+    ok = output.open(QIODevice::WriteOnly);
+  char buffer[16384];
+  while (ok) {
+    size_t count = fread(buffer, 1, sizeof(buffer), file);
+    if (count && output.write(buffer, static_cast<qint64>(count)) !=
+        static_cast<qint64>(count)) {
+      ok = false;
+      break;
+    }
+    if (count < sizeof(buffer)) {
+      ok = !ferror(file);
+      break;
+    }
+  }
+  if (fclose(file) != 0)
+    ok = false;
+  if (!ok) {
+    output.cancelWriting();
+    return false;
+  }
+  return output.commit();
 }
 
 /**
@@ -2500,9 +2535,33 @@ private:
     dlg.exec();
   }
 
+  /**
+   * @brief Validate a saved slot before creating any export output.
+   */
+  bool validateExportSet(int nsave)
+  {
+    if (nsave < 0)
+      return true;
+    bool valid = nsave < NSAVE && !saveTime[nsave].isEmpty();
+    if (valid) {
+      for (const ArrayData &arr : arrays) {
+        if (arr.saveVals[nsave].size() != arr.nvals) {
+          valid = false;
+          break;
+        }
+      }
+    }
+    if (!valid)
+      QMessageBox::warning(this, "ADT",
+        QString("Data is not defined for set %1").arg(nsave + 1));
+    return valid;
+  }
+
   bool writePlotFile(const QString &filename, int nsave = -1)
   {
-    FILE *file = fopen(filename.toUtf8().constData(), "w");
+    if (!validateExportSet(nsave))
+      return false;
+    FILE *file = std::tmpfile();
     if (!file)
       return false;
 
@@ -2512,12 +2571,6 @@ private:
       std::strncpy(tbuf, std::ctime(&now), 24);
       tbuf[24] = '\0';
     } else {
-      if (nsave >= NSAVE || saveTime[nsave].isEmpty()) {
-        fclose(file);
-        QMessageBox::warning(this, "ADT",
-          QString("Data is not defined for set %1").arg(nsave + 1));
-        return false;
-      }
       QByteArray st = saveTime[nsave].toUtf8();
       std::strncpy(tbuf, st.constData(), 24);
       tbuf[24] = '\0';
@@ -2549,12 +2602,6 @@ private:
       if (nsave < 0) {
         vals = &arr.vals;
       } else {
-        if (arr.saveVals[nsave].size() != arr.nvals) {
-          fclose(file);
-          QMessageBox::warning(this, "ADT",
-            QString("Data is not defined for set %1").arg(nsave + 1));
-          return false;
-        }
         vals = &arr.saveVals[nsave];
       }
       fprintf(file, "\n");
@@ -2564,12 +2611,12 @@ private:
         arr.units.toUtf8().constData());
       fprintf(file, "%d     !ADTDisplayArea\n", arr.area->index + 1);
       for (int i = 0; i < arr.nvals; ++i) {
-        fprintf(file, "%d %s % f\n", i + 1,
-          arr.names[i].toUtf8().constData(), (*vals)[i]);
+        fprintf(file, "%d %s %.*g\n", i + 1,
+          arr.names[i].toUtf8().constData(),
+          std::numeric_limits<double>::max_digits10, (*vals)[i]);
       }
     }
-    fclose(file);
-    return true;
+    return commitExport(file, filename);
   }
 
   bool readRefFile(const QString &filename)
@@ -2783,7 +2830,9 @@ private:
 
   bool writeSnapFile(const QString &filename, int nsave = -1)
   {
-    FILE *file = fopen(filename.toUtf8().constData(), "w");
+    if (!validateExportSet(nsave))
+      return false;
+    FILE *file = std::tmpfile();
     if (!file) {
       QMessageBox::warning(this, "ADT",
         QString("Unable to open %1").arg(filename));
@@ -2796,12 +2845,6 @@ private:
       std::strncpy(tbuf, std::ctime(&clock), 24);
       tbuf[24] = '\0';
     } else {
-      if (nsave >= NSAVE || saveTime[nsave].isEmpty()) {
-        fclose(file);
-        QMessageBox::warning(this, "ADT",
-          QString("Data is not defined for set %1").arg(nsave + 1));
-        return false;
-      }
       QByteArray st = saveTime[nsave].toUtf8();
       std::strncpy(tbuf, st.constData(), 24);
       tbuf[24] = '\0';
@@ -2832,23 +2875,22 @@ private:
       if (nsave < 0) {
         vals = &arr.vals;
       } else {
-        if (arr.saveVals[nsave].size() != arr.nvals) {
-          fclose(file);
-          QMessageBox::warning(this, "ADT",
-            QString("Data is not defined for set %1").arg(nsave + 1));
-          return false;
-        }
         vals = &arr.saveVals[nsave];
       }
       fprintf(file, "\n");
       fprintf(file, "%s (%s)\n", arr.heading.toUtf8().constData(),
         arr.units.toUtf8().constData());
       for (int i = 0; i < arr.nvals; ++i) {
-        fprintf(file, "%s pv - 1 %f\n",
-          arr.names[i].toUtf8().constData(), (*vals)[i]);
+        fprintf(file, "%s pv - 1 %.*g\n",
+          arr.names[i].toUtf8().constData(),
+          std::numeric_limits<double>::max_digits10, (*vals)[i]);
       }
     }
-    fclose(file);
+    if (!commitExport(file, filename)) {
+      QMessageBox::warning(this, "ADT",
+        QString("Unable to write %1").arg(filename));
+      return false;
+    }
     return true;
   }
 
@@ -2986,6 +3028,11 @@ private:
       caStarted = false;
     }
 
+    // Destroy widgets and their queued callbacks before releasing their data.
+    delete takeCentralWidget();
+    zoomPlot = nullptr;
+    zoomAreaPtr = nullptr;
+    setCentralWidget(new LogoWidget(this));
     arrays.clear();
     areas.clear();
     areaWidgets.clear();
@@ -3013,6 +3060,7 @@ private:
     if (!SDDS_InitializeInput(&table, fname.data())) {
       QMessageBox::warning(this, "ADT", "Unable to read PV file:\n" + file);
       ca_context_destroy();
+      channels.clear();
       caStarted = false;
       return;
     }
@@ -3034,6 +3082,7 @@ private:
           SDDS_Free(type);
           SDDS_Terminate(&table);
           ca_context_destroy();
+          channels.clear();
           caStarted = false;
           return;
         }
@@ -3043,6 +3092,7 @@ private:
           QMessageBox::warning(this, "ADT", "Missing ADTNArrays parameter");
           SDDS_Terminate(&table);
           ca_context_destroy();
+          channels.clear();
           caStarted = false;
           return;
         }
@@ -3217,6 +3267,7 @@ private:
         QMessageBox::warning(this, "ADT", "PV file missing ControlName column");
         SDDS_Terminate(&table);
         ca_context_destroy();
+        channels.clear();
         caStarted = false;
         return;
       }
