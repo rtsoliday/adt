@@ -1,3 +1,4 @@
+.DEFAULT_GOAL := all
 # Detect OS and Architecture
 OS := $(shell uname -s)
 ifeq ($(findstring CYGWIN, $(OS)),CYGWIN)
@@ -22,6 +23,8 @@ ifeq ($(OS), Linux)
   GSL_LOCAL = $(wildcard $(SDDS_REPO)/gsl)
 endif
 
+ENABLE_OPENMP ?= 1
+BUNDLE_OPENMP ?= 1
 include Makefile.rules
 export MOTIF
 
