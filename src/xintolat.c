@@ -68,7 +68,7 @@ int main(int argc, char **argv)
 		exit(0);
 		break;
 	    default:
-		sprintf(string,"Invalid option %s",argv[i]);
+		snprintf(string,sizeof(string),"Invalid option %s",argv[i]);
 		errmsg(string);
 		exit(8);
 	    }
@@ -77,6 +77,10 @@ int main(int argc, char **argv)
 	    if(nfiles >= 2) {
 		errmsg("Too many arguments");
 		usage();
+		exit(8);
+	    }
+	    if(strlen(argv[i]) >= PATH_MAX) {
+		errmsg("File name too long");
 		exit(8);
 	    }
 	    strcpy(filename[nfiles],argv[i]);

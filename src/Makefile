@@ -16,7 +16,7 @@ PROD = adt xintolat
 ifdef MOTIF
 adt_SRC = adt.c callback.c repaint.c event.c ut.c eca.c menu.c pix.c browserHelp.c file.c
 else
-adt_SRC = adt_qt.cc
+adt_SRC = adt_qt.cc adt_help.cc
 endif
 xintolat_SRC = xintolat.c
 

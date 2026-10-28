@@ -13,6 +13,7 @@
 
 #include "aps.icon"
 #include "adtVersion.h"
+#include "adt_help.h"
 
 #include <epicsVersion.h>
 #include <QSysInfo>
@@ -31,6 +32,7 @@
 #include <QMainWindow>
 #include <QMenu>
 #include <QMenuBar>
+#include <QActionGroup>
 #include <QPainter>
 #include <QPalette>
 #include <QVBoxLayout>
@@ -50,16 +52,22 @@
 #include <QPointF>
 #include <QColor>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QInputDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QPointer>
 #include <QPixmap>
 #include <QProcess>
+#include <QStandardPaths>
 #include <QTemporaryFile>
+#include <QSocketNotifier>
+#include <QHash>
 #include <limits>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
+#include <cctype>
 #include <algorithm>
 #include <cstring>
 #include <cstdio>
@@ -85,10 +93,12 @@ static const double scale[] = {
 };
 static constexpr int NSCALES = sizeof(scale) / sizeof(scale[0]);
 
+// Legacy X11 color names; Qt does not know X11 Green3 and Grey75, so they are
+// given by their X11 RGB values.
 static const char *defaultColors[] = {
-  "Red", "Blue", "Green3", "Gold", "Magenta", "Cyan", "Orange",
+  "Red", "Blue", "#00cd00", "Gold", "Magenta", "Cyan", "Orange",
   "Purple", "SpringGreen", "Chartreuse", "DeepSkyBlue",
-  "MediumSpringGreen", "Tomato", "Tan", "Grey75", "Black"
+  "MediumSpringGreen", "Tomato", "Tan", "#bfbfbf", "Black"
 };
 static constexpr int NCOLORS = sizeof(defaultColors) / sizeof(defaultColors[0]);
 static constexpr int NSAVE = 5;
@@ -97,7 +107,11 @@ static bool markers = true, lines = true, bars = false, grid = true,
   autoclear = true, showmaxmin = true, fillmaxmin = true, statMode = false,
   refOn = true, referenceLoaded = false;
 static int diffSet = -1, displaySet = -1, nsect = 0;
-static QColor displayColor("Grey40");
+// Status checking, as in legacy ADT: 0 None, 1 Invalid, 2 All (the default).
+static int checkStatusMode = 2;
+static constexpr short STATUS_NOTCONN = 100;  // status PV not readable
+static constexpr short STATUS_UNUSED = 200;   // StatusName "-"
+static QColor displayColor(0x66, 0x66, 0x66);  // X11 Grey40, as in legacy ADT
 static const QColor backgroundColor("#CCCCCC");
 static const QColor filledMinMaxColor(211, 211, 211, 127);
 static double nstat = 0.0, nstatTime = 0.0, stotal = 0.0;
@@ -141,21 +155,74 @@ struct ArrayData
   QVector<bool> conn;
   QVector<chid> chids;
   QVector<GetCallbackData> cbData;
+  QVector<qint64> getIssued;  // time of the outstanding get, or -1
+  // Status PVs from the StatusName column: 0 invalid, 2 old data, other
+  // values valid; STATUS_NOTCONN or STATUS_UNUSED otherwise.
+  bool statusCheck = false;
+  QVector<chid> statusChids;
+  QVector<short> statusVals;
+  QVector<GetCallbackData> statusCbData;
+  QVector<qint64> statusIssued;
   bool zoom = false;
   QString heading;
   QString units;
   double scaleFactor = 1.0;
+  bool logScale = false;  // ADTLogScale: plot and statistics in decades
   double sdev = 0.0;
   double avg = 0.0;
   double maxVal = 0.0;
+  bool sdevValid = true;
+  bool avgValid = true;
+  bool maxValid = true;
   double runSdev = 0.0;
   double runAvg = 0.0;
   double runMax = 0.0;
+  bool runMaxSet = false;
+  int runSdevCount = 0;
+  int runAvgCount = 0;
   AreaData *area = nullptr;
   QColor color;
   QVector<double> saveVals[NSAVE];
+  QVector<bool> saveAvail[NSAVE];
   QVector<double> refVals;
+  QVector<bool> refAvail;
+
+  /**
+   * @brief Whether the current reading of a point is available.
+   *
+   * A point whose status PV cannot be read is unavailable, as in legacy ADT.
+   */
+  bool available(int i) const
+  {
+    return conn[i] && !(statusCheck && statusVals[i] == STATUS_NOTCONN);
+  }
+
+  /**
+   * @brief Status exclusion of an available point under the Check Status mode.
+   *
+   * @return 0 when the point counts, 1 for invalid data, 2 for old data.
+   */
+  int excluded(int i) const
+  {
+    if (!statusCheck || statusVals[i] == STATUS_UNUSED || !available(i))
+      return 0;
+    if (checkStatusMode >= 1 && statusVals[i] == 0)
+      return 1;
+    if (checkStatusMode == 2 && statusVals[i] == 2)
+      return 2;
+    return 0;
+  }
 };
+
+/**
+ * @brief Availability of a point in a stored set or the reference.
+ *
+ * Sets read from files without an ADTAvailable column are fully available.
+ */
+static bool setAvailable(const QVector<bool> &avail, int i)
+{
+  return i >= avail.size() || avail[i];
+}
 
 class PlotWidget;
 class AreaWidget;
@@ -166,6 +233,18 @@ static AreaWidget *zoomAreaWidget = nullptr;
 static void updateZoomCenter();
 static void updateZoomInterval();
 static void getCallback(struct event_handler_args args);
+static void caFdRegistration(void *arg, int fd, int opened);
+
+/**
+ * @brief Milliseconds on a monotonic clock, for get deadlines.
+ */
+static qint64 monotonicMs()
+{
+  static QElapsedTimer clock;
+  if (!clock.isValid())
+    clock.start();
+  return clock.elapsed();
+}
 
 /**
  * @brief Format a PV value for point detail popups.
@@ -179,6 +258,96 @@ static void getCallback(struct event_handler_args args);
 static QString formatPvValue(double value)
 {
   return QString::number(value, 'g', 4);
+}
+
+/**
+ * @brief Population statistics of one update's plotted values.
+ */
+struct Statistics
+{
+  double sdev = 0.0;
+  double avg = 0.0;
+  double max = 0.0;
+  bool sdevValid = true;
+  bool avgValid = true;
+  bool maxValid = true;
+};
+
+/**
+ * @brief Compute SDEV, AVG, and largest-magnitude MAX in two passes.
+ *
+ * The mean is computed first, as the sum divided by the count, and the
+ * variance is the mean squared deviation from it (population definition),
+ * taken about the mean refined by one correction pass. Deviations are
+ * scaled by the largest one so that finite values cannot overflow the
+ * squares; a statistic that itself cannot be represented is marked invalid.
+ * An empty sample gives zeros.
+ *
+ * @param values Finite values of the points that count.
+ * @return Statistics and their validity.
+ */
+static Statistics computeStatistics(const QVector<double> &values)
+{
+  Statistics st;
+  int n = values.size();
+  if (n == 0)
+    return st;
+  double sum = 0.0;
+  for (double v : values)
+    sum += v;
+  double mean = sum / n;
+  if (!std::isfinite(mean)) {
+    mean = 0.0;
+    for (double v : values)
+      mean += v / n;
+  }
+  st.avg = mean;
+  st.avgValid = std::isfinite(mean);
+  st.max = values[0];
+  for (double v : values) {
+    if (std::fabs(v) > std::fabs(st.max))
+      st.max = v;
+  }
+  if (!st.avgValid) {
+    st.sdevValid = false;
+    return st;
+  }
+  // Take deviations from the mean refined by one correction pass, which
+  // absorbs the rounding of the first sum, so that constant data gives an
+  // SDEV of exactly zero. AVG keeps the plain mean.
+  double center = mean;
+  double residual = 0.0;
+  for (double v : values)
+    residual += v - mean;
+  if (std::isfinite(residual))
+    center += residual / n;
+  // Halved deviations are exact and cannot overflow for finite values.
+  double largest = 0.0;
+  for (double v : values)
+    largest = std::max(largest, std::fabs(v / 2 - center / 2));
+  if (largest == 0.0) {
+    st.sdev = 0.0;
+  } else {
+    double sumsq = 0.0;
+    for (double v : values) {
+      double d = (v / 2 - center / 2) / largest;
+      sumsq += d * d;
+    }
+    st.sdev = largest * std::sqrt(sumsq / n) * 2;
+    st.sdevValid = std::isfinite(st.sdev);
+  }
+  return st;
+}
+
+/**
+ * @brief Format a statistic for a title row, or "n/a" if it is undefined.
+ */
+static QString formatStatistic(double value, bool valid, double multiplier)
+{
+  double shown = value * multiplier;
+  if (!valid || !std::isfinite(shown))
+    return QString("n/a");
+  return QString("%1").arg(shown, 0, 'f', 3);
 }
 
 struct LoadItem
@@ -353,6 +522,66 @@ static void freeSddsStrings(int n, char **p)
 }
 
 /**
+ * @brief Initialize SDDS input and release a partially read layout on failure.
+ *
+ * Failed initialization can retain an open file and layout allocations before
+ * SDDS saves its cleanup layout. Use the public layout APIs to transfer that
+ * ownership to SDDS_Terminate without changing successful reads.
+ */
+static bool initializeSddsInput(SDDS_TABLE *table, char *filename)
+{
+  *table = {};
+  if (SDDS_InitializeInput(table, filename))
+    return true;
+  SDDS_DeferSavingLayout(table, 0);
+  if (SDDS_SaveLayout(table))
+    SDDS_Terminate(table);
+  return false;
+}
+
+/**
+ * @brief Read an allocated SDDS string without interpreting numeric storage as a pointer.
+ *
+ * The caller releases a successful result with SDDS_Free.
+ */
+static char *readStringParameter(SDDS_TABLE *table, const char *name)
+{
+  int index = SDDS_GetParameterIndex(table, const_cast<char *>(name));
+  if (index < 0 || SDDS_GetParameterType(table, index) != SDDS_STRING)
+    return nullptr;
+  char *value = nullptr;
+  if (!SDDS_GetParameter(table, const_cast<char *>(name), &value))
+    return nullptr;
+  return value;
+}
+
+/**
+ * @brief Parse a complete finite snapshot value, preserving strtod precision.
+ */
+static bool parseSnapshotValue(const char *text, double &value)
+{
+  if (!text)
+    return false;
+  char *end = nullptr;
+  value = std::strtod(text, &end);
+  if (end == text || !std::isfinite(value))
+    return false;
+  while (*end && std::isspace(static_cast<unsigned char>(*end)))
+    ++end;
+  return !*end;
+}
+
+/**
+ * @brief Write a string column with SDDS whitespace and punctuation escaping.
+ */
+static bool writeSddsString(FILE *file, const QString &value)
+{
+  QByteArray bytes = value.toUtf8();
+  char *text = bytes.data();
+  return SDDS_WriteTypedValue(&text, 0, SDDS_STRING, nullptr, file) != 0;
+}
+
+/**
  * @brief Commit a completed export without truncating an existing destination.
  *
  * Closes the temporary stream on every path. QSaveFile discards incomplete
@@ -410,10 +639,25 @@ static QList<LoadMenuInfo> readInitFile(const QString &filename,
   snapDirectory = adtHome + "/snap";
   if (filename.isEmpty())
     return menus;
+  SDDS_ClearErrors();
   SDDS_TABLE table;
   QByteArray fname = filename.toUtf8();
-  if (!SDDS_InitializeInput(&table, fname.data()))
+  if (!initializeSddsInput(&table, fname.data()))
     return menus;
+  const char *stringParameters[] = {"ADTPVDirectory", "ADTPVSubDirectory",
+    "ADTSnapDirectory", "ADTXPVDirectory", "ADTXSnapDirectory", "ADTMenuTitle"};
+  for (const char *name : stringParameters) {
+    int index = SDDS_GetParameterIndex(&table, const_cast<char *>(name));
+    if (index >= 0 && SDDS_GetParameterType(&table, index) != SDDS_STRING) {
+      SDDS_Terminate(&table);
+      return menus;
+    }
+  }
+  if (SDDS_CheckColumn(&table, const_cast<char *>("ADTPVFile"), NULL,
+      SDDS_STRING, NULL) != SDDS_CHECK_OKAY) {
+    SDDS_Terminate(&table);
+    return menus;
+  }
   int foundLabels = SDDS_CheckColumn(&table, const_cast<char *>("ADTMenuLabel"),
     NULL, SDDS_STRING, NULL) == SDDS_CHECK_OKAY;
   bool first = true;
@@ -471,6 +715,11 @@ static QList<LoadMenuInfo> readInitFile(const QString &filename,
       const_cast<char *>("ADTPVFile"));
     char **labels = foundLabels ? (char **)SDDS_GetColumn(&table,
       const_cast<char *>("ADTMenuLabel")) : NULL;
+    if (!files) {
+      freeSddsStrings(rows, labels);
+      menus.clear();
+      break;
+    }
     for (int i = 0; i < rows; ++i) {
       QString fname = pvDirectory + "/" + files[i];
       QString lab = labels ? labels[i] : files[i];
@@ -499,22 +748,34 @@ static bool readLatticeFile(const QString &filename, int &nsectOut,
   latRing = false;
   SDDS_TABLE table;
   QByteArray fname = filename.toUtf8();
-  if (!SDDS_InitializeInput(&table, fname.data()))
+  if (!initializeSddsInput(&table, fname.data()))
     return false;
   if (SDDS_ReadTable(&table) != 1) {
     SDDS_Terminate(&table);
     return false;
   }
+  if (SDDS_CheckColumn(&table, const_cast<char *>("Name"), NULL,
+      SDDS_STRING, NULL) != SDDS_CHECK_OKAY ||
+      SDDS_CheckColumn(&table, const_cast<char *>("S"), NULL,
+      SDDS_DOUBLE, NULL) != SDDS_CHECK_OKAY ||
+      SDDS_CheckColumn(&table, const_cast<char *>("Length"), NULL,
+      SDDS_DOUBLE, NULL) != SDDS_CHECK_OKAY ||
+      SDDS_CheckColumn(&table, const_cast<char *>("SymbolHeight"), NULL,
+      SDDS_SHORT, NULL) != SDDS_CHECK_OKAY) {
+    SDDS_Terminate(&table);
+    return false;
+  }
   bool ok = false;
   char *type = NULL;
-  type = SDDS_GetParameterAsString(&table, const_cast<char *>("ADTFileType"), NULL);
+  type = readStringParameter(&table, "ADTFileType");
   if (type && !strcmp(type, "ADTLATTICE")) {
     int32_t ns;
     double st;
     int32_t ringVal = 1;
     SDDS_GetParameterAsLong(&table, const_cast<char *>("Ring"), &ringVal);
     if (SDDS_GetParameterAsLong(&table, const_cast<char *>("Nsectors"), &ns) &&
-        SDDS_GetParameterAsDouble(&table, const_cast<char *>("Stotal"), &st)) {
+        SDDS_GetParameterAsDouble(&table, const_cast<char *>("Stotal"), &st) &&
+        ns > 0 && std::isfinite(st) && st > 0.0) {
       nsectOut = static_cast<int>(ns);
       stotalOut = st;
       int rows = SDDS_CountRowsOfInterest(&table);
@@ -527,14 +788,25 @@ static bool readLatticeFile(const QString &filename, int &nsectOut,
       short *height = (short *)SDDS_GetColumn(&table,
         const_cast<char *>("SymbolHeight"));
       if (names && scol && len && height) {
+        bool valid = true;
         for (int i = 0; i < rows; ++i) {
-          latNames.append(names[i]);
-          latS.append(scol[i]);
-          latLen.append(len[i]);
-          latHeight.append(height[i]);
+          if (!std::isfinite(scol[i]) || !std::isfinite(len[i]) ||
+              scol[i] < 0.0 || scol[i] > st || len[i] < 0.0 ||
+              (i > 0 && scol[i] < scol[i - 1])) {
+            valid = false;
+            break;
+          }
         }
-        latRing = ringVal != 0;
-        ok = true;
+        if (valid) {
+          for (int i = 0; i < rows; ++i) {
+            latNames.append(names[i]);
+            latS.append(scol[i]);
+            latLen.append(len[i]);
+            latHeight.append(height[i]);
+          }
+          latRing = ringVal != 0;
+          ok = true;
+        }
       }
       freeSddsStrings(rows, names);
       SDDS_Free(scol);
@@ -580,7 +852,7 @@ protected:
     };
 
     drawCentered("Array Display Tool", ystart - linespacing);
-    drawCentered("Written by Dwarfs in the Waterfall Glenn", ystart);
+    drawCentered("Written by Dwarfs in the Waterfall Glen", ystart);
     drawCentered(QString("Version %1 %2").arg(ADT_VERSION_STRING)
       .arg(EPICS_VERSION_STRING), ystart + linespacing);
 
@@ -635,18 +907,57 @@ protected:
       // necessary. This avoids clamping out-of-range values to the plot
       // boundaries, which previously caused points to appear on the edge of
       // the graph.
-      return bottom - static_cast<int>((v - ymin) * yscale);
+      double offset = (v - ymin) * yscale;
+      // Keep clipping outside the visible plot, but within integer/raster bounds.
+      if (std::isnan(offset))
+        offset = 0.0;
+      offset = std::max(-1000000.0, std::min(1000000.0, offset));
+      return bottom - static_cast<int>(offset);
     };
 
     bool refOnLoaded = referenceLoaded && refOn;
     bool diffOn = diffSet >= 0;
-    auto diffVal = [&](ArrayData *arr, const QVector<double> &vec, int idx) {
-      double v = vec[idx];
-      if (refOnLoaded && arr->refVals.size() == arr->nvals)
-        v -= arr->refVals[idx];
+    // The plotted quantity of vec[idx], or false when it is undefined. A log
+    // array plots log10(scale factor x value), and in difference or reference
+    // mode the change in decades; a nonpositive operand has no logarithm.
+    auto transform = [&](ArrayData *arr, const QVector<double> &vec, int idx,
+      double &y) {
+      const QVector<double> *subtract = nullptr;
       if (diffOn && arr->saveVals[diffSet].size() == arr->nvals)
-        v -= arr->saveVals[diffSet][idx];
-      return v * arr->scaleFactor;
+        subtract = &arr->saveVals[diffSet];
+      else if (refOnLoaded && arr->refVals.size() == arr->nvals)
+        subtract = &arr->refVals;
+      if (!arr->logScale) {
+        y = (vec[idx] - (subtract ? (*subtract)[idx] : 0.0)) * arr->scaleFactor;
+        return true;
+      }
+      double v = arr->scaleFactor * vec[idx];
+      if (!(v > 0.0))
+        return false;
+      y = std::log10(v);
+      if (subtract) {
+        double s = arr->scaleFactor * (*subtract)[idx];
+        if (!(s > 0.0))
+          return false;
+        y -= std::log10(s);
+      }
+      return true;
+    };
+    // Max/min envelope values; an undefined logarithm maps to the plot bottom.
+    auto diffVal = [&](ArrayData *arr, const QVector<double> &vec, int idx) {
+      double y;
+      return transform(arr, vec, idx, y) ? y : std::numeric_limits<double>::quiet_NaN();
+    };
+    // The plotted value of a point of the current values (set < 0) or of a
+    // stored set. A point that is unavailable in either operand has none.
+    auto plotValue = [&](ArrayData *arr, const QVector<double> &vec, int set,
+      int idx, double &y) {
+      bool ok = set < 0 ? arr->available(idx) : setAvailable(arr->saveAvail[set], idx);
+      if (diffOn && arr->saveVals[diffSet].size() == arr->nvals)
+        ok = ok && setAvailable(arr->saveAvail[diffSet], idx);
+      else if (refOnLoaded && arr->refVals.size() == arr->nvals)
+        ok = ok && setAvailable(arr->refAvail, idx);
+      return transform(arr, vec, idx, y) && ok;
     };
 
     if (grid) {
@@ -827,8 +1138,74 @@ protected:
       }
     };
 
+    // Draw lines between consecutive points that have values, normal markers,
+    // and the legacy not-connected marker (a black 5x5 square) on the center
+    // line for points without a value.
+    auto finishArray = [&](int count, const QColor &clr, bool wrapped,
+      bool allowWrap) {
+      bool allValid = !tmpState.contains(0);
+      bool allNormal = allValid && !tmpState.contains(2) && !tmpState.contains(3);
+      if (lines) {
+        int first = 0;
+        while (first < count) {
+          while (first < count && !tmpState[first])
+            ++first;
+          int last = first;
+          while (last < count && tmpState[last])
+            ++last;
+          if (last - first >= 2) {
+            QVector<QPointF> run = allValid ? tmpPts : tmpPts.mid(first, last - first);
+            if (wrapped)
+              drawPolylineWrapped(run, allowWrap);
+            else
+              pmap.drawPolyline(run.constData(), run.size());
+          }
+          first = last;
+        }
+      }
+      if (markers) {
+        QPen oldPen = pmap.pen();
+        QPen markerPen(clr, 3);
+        markerPen.setCapStyle(Qt::SquareCap);
+        pmap.setPen(markerPen);
+        if (allNormal) {
+          pmap.drawPoints(tmpPts.constData(), count);
+        } else {
+          for (int i = 0; i < count; ++i)
+            if (tmpState[i] == 1)
+              pmap.drawPoint(tmpPts[i]);
+        }
+        pmap.setPen(oldPen);
+      }
+      if (allNormal)
+        return;
+      for (int i = 0; i < count; ++i) {
+        int px = static_cast<int>(tmpPts[i].x());
+        int py = static_cast<int>(tmpPts[i].y());
+        if (!tmpState[i]) {
+          pmap.fillRect(px - 2, y0 - 2, 5, 5, Qt::black);
+        } else if (tmpState[i] > 1) {
+          // Legacy status markers: a rounded 5x5 dot, X11 Grey30 for invalid
+          // data and Grey50 for old data (Qt does not know X11 color names).
+          QColor statusColor = tmpState[i] == 2 ? QColor(0x4d, 0x4d, 0x4d) :
+            QColor(0x7f, 0x7f, 0x7f);
+          pmap.fillRect(px - 2, py - 1, 5, 3, statusColor);
+          pmap.fillRect(px - 1, py - 2, 3, 1, statusColor);
+          pmap.fillRect(px - 1, py + 2, 3, 1, statusColor);
+        }
+      }
+    };
+    // Drawing state of a point: 0 without a value, 1 normal, 2 excluded as
+    // invalid, 3 excluded as old data (status markers apply to current values).
+    auto pointState = [&](ArrayData *arr, const QVector<double> &vec, int set,
+      int idx, double &y) {
+      if (!plotValue(arr, vec, set, idx, y))
+        return 0;
+      return set < 0 ? 1 + arr->excluded(idx) : 1;
+    };
+
     auto drawArray = [&](int arrIndex, ArrayData *arr,
-      const QVector<double> &vec, const QColor &clr) {
+      const QVector<double> &vec, int set, const QColor &clr) {
       if (arr->nvals < 1 || vec.size() != arr->nvals)
         return;
       pmap.setPen(clr);
@@ -839,8 +1216,8 @@ protected:
           ZoomLimit limit = zoomLimits[arrIndex];
           int count = limit.max - limit.min + 1;
           if (count > 0) {
-            if (lines || markers)
-              tmpPts.resize(count);
+            tmpPts.resize(count);
+            tmpState.fill(1, count);
             for (int i = 0; i < count; ++i) {
               int idx = limit.min + i;
               int wrapped = idx;
@@ -861,23 +1238,15 @@ protected:
                   sval -= stotal;
               }
               double x = plotRect.left() + (sval - zoomSmin) * zoomXScale;
-              int y = mapY(diffVal(arr, vec, wrapped));
+              double yv;
+              tmpState[i] = pointState(arr, vec, set, wrapped, yv);
+              int y = tmpState[i] ? mapY(yv) : y0;
               int xi = static_cast<int>(x);
-              if (bars)
+              if (bars && tmpState[i])
                 pmap.drawLine(xi, y0, xi, y);
-              if (lines || markers)
-                tmpPts[i] = QPointF(x, y);
+              tmpPts[i] = QPointF(x, y);
             }
-            if (lines)
-              drawPolylineWrapped(tmpPts, zoomDrawWrap);
-            if (markers) {
-              QPen oldPen = pmap.pen();
-              QPen markerPen(clr, 3);
-              markerPen.setCapStyle(Qt::SquareCap);
-              pmap.setPen(markerPen);
-              pmap.drawPoints(tmpPts.constData(), count);
-              pmap.setPen(oldPen);
-            }
+            finishArray(count, clr, true, zoomDrawWrap);
             drewZoom = true;
           }
         }
@@ -899,32 +1268,27 @@ protected:
           smax = arr->s[end] + (end < start ? stotal : 0.0);
         }
         double range = smax - smin;
-        double xscale = plotRect.width() / range;
-        if (lines || markers)
-          tmpPts.resize(count);
+        bool haveSRange = std::isfinite(range) && range > 0.0;
+        double xscale = haveSRange ? plotRect.width() / range : 0.0;
+        tmpPts.resize(count);
+        tmpState.fill(1, count);
         for (int i = 0; i < count; ++i) {
           int idx = (start + i) % nvals;
           double sval = arr->s[idx];
           if (count < nvals && idx < start)
             sval += stotal;
-          double x = plotRect.left() + (sval - smin) * xscale;
-          int y = mapY(diffVal(arr, vec, idx));
+          double x = haveSRange ?
+            plotRect.left() + (sval - smin) * xscale :
+            plotRect.left() + (i + 0.5) * plotRect.width() / count;
+          double yv;
+          tmpState[i] = pointState(arr, vec, set, idx, yv);
+          int y = tmpState[i] ? mapY(yv) : y0;
           int xi = static_cast<int>(x);
-          if (bars)
+          if (bars && tmpState[i])
             pmap.drawLine(xi, y0, xi, y);
-          if (lines || markers)
-            tmpPts[i] = QPointF(x, y);
+          tmpPts[i] = QPointF(x, y);
         }
-        if (lines)
-          drawPolylineWrapped(tmpPts, zoomDrawWrap);
-        if (markers) {
-          QPen oldPen = pmap.pen();
-          QPen markerPen(clr, 3);
-          markerPen.setCapStyle(Qt::SquareCap);
-          pmap.setPen(markerPen);
-          pmap.drawPoints(tmpPts.constData(), count);
-          pmap.setPen(oldPen);
-        }
+        finishArray(count, clr, true, zoomDrawWrap);
       } else {
         int start = area->xStart;
         int end = area->xEnd >= area->xStart ? area->xEnd + 1 : arr->nvals;
@@ -938,26 +1302,20 @@ protected:
         double xstep = plotRect.width() /
           static_cast<double>(count);
         double x = plotRect.left() + xstep / 2.0;
-        if (lines || markers)
-          tmpPts.resize(count);
+        tmpPts.resize(count);
+        tmpState.fill(1, count);
         for (int i = start; i < end; ++i, x += xstep) {
-          int y = mapY(diffVal(arr, vec, i));
+          double yv;
+          int state = pointState(arr, vec, set, i, yv);
+          bool ok = state != 0;
+          tmpState[i - start] = state;
+          int y = ok ? mapY(yv) : y0;
           int xi = static_cast<int>(x);
-          if (bars)
+          if (bars && ok)
             pmap.drawLine(xi, y0, xi, y);
-          if (lines || markers)
-            tmpPts[i - start] = QPointF(x, y);
+          tmpPts[i - start] = QPointF(x, y);
         }
-        if (lines)
-          pmap.drawPolyline(tmpPts.constData(), count);
-        if (markers) {
-          QPen oldPen = pmap.pen();
-          QPen markerPen(clr, 3);
-          markerPen.setCapStyle(Qt::SquareCap);
-          pmap.setPen(markerPen);
-          pmap.drawPoints(tmpPts.constData(), count);
-          pmap.setPen(oldPen);
-        }
+        finishArray(count, clr, false, false);
       }
     };
 
@@ -967,13 +1325,13 @@ protected:
         QColor clr = displayColor;
         if (clr == arr->color)
           clr = Qt::green;
-        drawArray(i, arr, arr->saveVals[displaySet], clr);
+        drawArray(i, arr, arr->saveVals[displaySet], displaySet, clr);
       }
     }
 
     for (int i = 0; i < arrayPtrs.size(); ++i) {
       auto arr = arrayPtrs[i];
-      drawArray(i, arr, arr->vals, arr->color);
+      drawArray(i, arr, arr->vals, -1, arr->color);
     }
 
       if (this == zoomPlot && nsect > 0 && stotal > 0.0 && !arrayPtrs.isEmpty() &&
@@ -1111,22 +1469,34 @@ protected:
           }
         }
       } else {
-        double xstep = nvals > 1 ? plotRect.width() /
-          static_cast<double>(nvals - 1) : 0.0;
-        nmid = static_cast<int>((event->pos().x() - plotRect.left()) /
-          xstep + 0.5);
+        if (plotRect.width() > 0) {
+          nmid = static_cast<int>((event->pos().x() - plotRect.left()) *
+            static_cast<double>(nvals) / plotRect.width());
+          nmid = std::max(0, std::min(nvals - 1, nmid));
+        }
       }
       QString info;
       for (auto arr : arrayPtrs) {
+        if (arr->nvals < 1)
+          continue;
         info += arr->heading + "\n";
         for (int off = -1; off <= 1; ++off) {
           int idx = wrapIndex(nmid + off, arr->nvals);
           double val = arr->scaleFactor * arr->vals[idx];
+          QString text;
+          if (!arr->available(idx))
+            text = "Unavailable";
+          else if (!arr->logScale)
+            text = formatPvValue(val);
+          else if (val > 0.0)
+            text = formatPvValue(std::log10(val));
+          else
+            text = QString::fromUtf8("\xE2\x89\xA4 0 (log undefined)");
           QString line = QString("%1%2 %3  %4\n")
             .arg(idx == nmid ? "->" : "  ")
             .arg(idx + 1)
             .arg(arr->names[idx])
-            .arg(formatPvValue(val), 11);
+            .arg(text, 11);
           info += line;
         }
       }
@@ -1312,11 +1682,11 @@ protected:
     int steps = event->angleDelta().y() / 120;
     if (steps != 0) {
       double factor = std::pow(1.2, steps);
-      int newSpan = static_cast<int>(span / factor + 0.5);
-      if (newSpan < 1)
-        newSpan = 1;
-      if (newSpan > nvals)
-        newSpan = nvals;
+      // Bound the floating-point result before converting, including when
+      // a large wheel delta makes factor underflow to zero.
+      double requestedSpan = span / factor + 0.5;
+      int newSpan = static_cast<int>(std::max(1.0,
+        std::min(static_cast<double>(nvals), requestedSpan)));
       int offset = static_cast<int>(frac * (newSpan - 1) + 0.5);
       int newStart = wrapIndex(pivot - offset, nvals);
       int newEnd = wrapIndex(newStart + newSpan - 1, nvals);
@@ -1393,6 +1763,7 @@ private:
   QPointer<QMessageBox> infoBox;
   QPixmap pixmap;
   QVector<QPointF> tmpPts;
+  QVector<int> tmpState;
   bool rightDown = false;
   int lastRightX = 0;
   double dragRemainder = 0.0;
@@ -1438,6 +1809,9 @@ public:
         headLabel->setText(head);
         headLabel->setFont(fixedFont);
         row->addWidget(headLabel);
+        auto availabilityLabel = new QLabel;
+        availabilityLabel->setFont(fixedFont);
+        row->addWidget(availabilityLabel);
         row->addStretch();
         auto sdevText = new QLabel("SDEV:");
         sdevText->setFont(fixedFont);
@@ -1463,7 +1837,7 @@ public:
         maxLabel->setAlignment(Qt::AlignRight);
         maxLabel->setFixedWidth(statWidth);
         row->addWidget(maxLabel);
-        StatLabels sl{ sdevLabel, avgLabel, maxLabel };
+        StatLabels sl{ sdevLabel, avgLabel, maxLabel, availabilityLabel };
         stats.append(sl);
       }
     }
@@ -1749,17 +2123,34 @@ private:
     for (int i = 0; i < arrayPtrs.size() && i < stats.size(); ++i) {
       auto arr = arrayPtrs[i];
       auto sl = stats[i];
-      double sdevVal = (statMode && nstat > 0)
-        ? arr->runSdev / nstat : arr->sdev;
-      double avgVal = (statMode && nstat > 0)
-        ? arr->runAvg / nstat : arr->avg;
-      double maxVal = statMode ? arr->runMax : arr->maxVal;
-      sl.sdev->setText(QString("%1").arg(
-        sdevVal * arr->scaleFactor, 0, 'f', 3));
-      sl.avg->setText(QString("%1").arg(
-        avgVal * arr->scaleFactor, 0, 'f', 3));
-      sl.max->setText(QString("%1").arg(
-        maxVal * arr->scaleFactor, 0, 'f', 3));
+      int unavailable = 0;
+      int excluded = 0;
+      for (int k = 0; k < arr->nvals; ++k) {
+        unavailable += !arr->available(k);
+        excluded += arr->excluded(k) != 0;
+      }
+      QStringList counts;
+      if (unavailable > 0)
+        counts << QString("Unavailable: %1/%2").arg(unavailable).arg(arr->nvals);
+      if (excluded > 0)
+        counts << QString("Excluded: %1/%2").arg(excluded).arg(arr->nvals);
+      sl.availability->setText(counts.join("  "));
+      // Log arrays already include the scale factor in their decades.
+      double factor = arr->logScale ? 1.0 : arr->scaleFactor;
+      if (statMode && nstat > 0) {
+        sl.sdev->setText(formatStatistic(arr->runSdevCount > 0 ?
+          arr->runSdev / arr->runSdevCount : 0.0, arr->runSdevCount > 0, factor));
+        sl.avg->setText(formatStatistic(arr->runAvgCount > 0 ?
+          arr->runAvg / arr->runAvgCount : 0.0, arr->runAvgCount > 0, factor));
+      } else {
+        sl.sdev->setText(formatStatistic(arr->sdev, arr->sdevValid, factor));
+        sl.avg->setText(formatStatistic(arr->avg, arr->avgValid, factor));
+      }
+      if (statMode)
+        sl.max->setText(formatStatistic(arr->runMax,
+          arr->runMaxSet || !arr->logScale, factor));
+      else
+        sl.max->setText(formatStatistic(arr->maxVal, arr->maxValid, factor));
     }
   }
 
@@ -1926,6 +2317,7 @@ private:
     QLabel *sdev;
     QLabel *avg;
     QLabel *max;
+    QLabel *availability;
   };
 
   AreaData *area;
@@ -1965,15 +2357,43 @@ static void updateZoomInterval()
 static void getCallback(struct event_handler_args args)
 {
   GetCallbackData *cb = static_cast<GetCallbackData *>(args.usr);
-  if (!cb || !cb->arr)
+  if (!cb || !cb->arr || cb->index < 0 ||
+      cb->index >= cb->arr->vals.size() || cb->index >= cb->arr->conn.size() ||
+      cb->index >= cb->arr->getIssued.size())
     return;
-  if (args.status == ECA_NORMAL && args.dbr) {
-    cb->arr->vals[cb->index] = *static_cast<const double *>(args.dbr);
+  cb->arr->getIssued[cb->index] = -1;
+  double value = std::numeric_limits<double>::quiet_NaN();
+  if (args.status == ECA_NORMAL && args.dbr && args.type == DBR_DOUBLE &&
+      args.count >= 1)
+    value = *static_cast<const double *>(args.dbr);
+  if (std::isfinite(value)) {
+    cb->arr->vals[cb->index] = value;
     cb->arr->conn[cb->index] = true;
   } else {
     cb->arr->vals[cb->index] = 0.0;
     cb->arr->conn[cb->index] = false;
   }
+}
+
+/**
+ * @brief CA get callback for status PV updates.
+ *
+ * @param args Channel Access event arguments.
+ */
+static void statusCallback(struct event_handler_args args)
+{
+  GetCallbackData *cb = static_cast<GetCallbackData *>(args.usr);
+  if (!cb || !cb->arr || cb->index < 0 ||
+      cb->index >= cb->arr->statusVals.size() ||
+      cb->index >= cb->arr->statusIssued.size())
+    return;
+  cb->arr->statusIssued[cb->index] = -1;
+  if (args.status == ECA_NORMAL && args.dbr && args.type == DBR_ENUM &&
+      args.count >= 1)
+    cb->arr->statusVals[cb->index] = static_cast<short>(
+      *static_cast<const dbr_enum_t *>(args.dbr));
+  else
+    cb->arr->statusVals[cb->index] = STATUS_NOTCONN;
 }
 
 /**
@@ -1985,7 +2405,8 @@ public:
   explicit MainWindow(const QString &homeOverride, bool homeSpecified,
     const QString &startupPv, int zoomSect, int zoomInt, bool xorbitMode,
     QWidget *parent = nullptr)
-    : QMainWindow(parent), initZoomSector(zoomSect), initZoomInterval(zoomInt)
+    : QMainWindow(parent), initZoomSector(zoomSect), initZoomInterval(zoomInt),
+      xorbit(xorbitMode)
   {
     auto logo = new LogoWidget(this);
     setCentralWidget(logo);
@@ -2112,6 +2533,21 @@ public:
       if (zoomWidget)
         zoomWidget->setVisible(zoomOn);
     });
+    checkStatusMenu = optionsMenu->addMenu("Check Status");
+    checkStatusMenu->setEnabled(!arrays.isEmpty() && arrays[0].statusCheck);
+    auto statusGroup = new QActionGroup(this);
+    const char *statusModes[] = { "None", "Invalid", "All" };
+    for (int mode = 0; mode < 3; ++mode) {
+      QAction *act = checkStatusMenu->addAction(statusModes[mode]);
+      act->setCheckable(true);
+      act->setChecked(mode == checkStatusMode);
+      statusGroup->addAction(act);
+      connect(act, &QAction::triggered, this, [this, mode]()
+      {
+        checkStatusMode = mode;
+        resetGraph();
+      });
+    }
     QAction *statAct = optionsMenu->addAction("Accumulated Statistics");
     statAct->setCheckable(true);
     statAct->setChecked(statMode);
@@ -2124,6 +2560,9 @@ public:
         arr.runSdev = 0.0;
         arr.runAvg = 0.0;
         arr.runMax = 0.0;
+        arr.runMaxSet = false;
+        arr.runSdevCount = 0;
+        arr.runAvgCount = 0;
       }
       for (AreaData &area : areas)
         area.tempclear = true;
@@ -2245,20 +2684,9 @@ public:
       autoclear = checked;
     });
 
-    QMenu *helpMenu = menuBar()->addMenu("Help");
-    QAction *versionAct = helpMenu->addAction("Version");
-    connect(versionAct, &QAction::triggered, this, [this]()
-    {
-      QString unameStr = QString("Running %1 %2 on %3")
-        .arg(QSysInfo::kernelType())
-        .arg(QSysInfo::kernelVersion())
-        .arg(QSysInfo::machineHostName());
-      QString msg = QString("%1 %2\n\nWritten by Dwarfs in the Waterfall Glen\n\n%3")
-        .arg(ADT_VERSION_STRING)
-        .arg(EPICS_VERSION_STRING)
-        .arg(unameStr);
-      QMessageBox::information(this, "ADT Version", msg);
-    });
+    QMenu *helpMenu = menuBar()->addMenu("&Help");
+    helpMenu->setObjectName("helpMenu");
+    adt::populateHelpMenu(helpMenu, this);
 
     QMenu *topMenus[] = { fileMenu, optionsMenu, viewMenu, clearMenu, helpMenu };
     for (QMenu *m : topMenus) {
@@ -2292,8 +2720,12 @@ public:
     if (n < 1 || n > NSAVE || arrays.isEmpty())
       return;
     int idx = n - 1;
-    for (ArrayData &arr : arrays)
+    for (ArrayData &arr : arrays) {
       arr.saveVals[idx] = arr.vals;
+      arr.saveAvail[idx].resize(arr.nvals);
+      for (int i = 0; i < arr.nvals; ++i)
+        arr.saveAvail[idx][i] = arr.available(i);
+    }
     time_t now = std::time(nullptr);
     char tbuf[26];
     std::strncpy(tbuf, std::ctime(&now), 24);
@@ -2327,6 +2759,16 @@ public:
   void diffSet(int n)
   {
     if (n >= 1 && n <= NSAVE) {
+      if (arrays.isEmpty()) {
+        QMessageBox::warning(this, "ADT", "There are no PV's defined");
+        return;
+      }
+      for (const ArrayData &arr : arrays) {
+        if (arr.saveVals[n - 1].size() != arr.nvals) {
+          QMessageBox::warning(this, "ADT", "Data is not defined");
+          return;
+        }
+      }
       if (::diffSet < 0) {
         for (AreaData &area : areas) {
           area.oldCenterVal = area.centerVal;
@@ -2376,15 +2818,18 @@ private:
   QAction *gridAct = nullptr;
   QAction *maxminAct = nullptr;
   QAction *fillAct = nullptr;
+  QMenu *checkStatusMenu = nullptr;
   AreaData zoomArea;
   bool zoomOn = true;
   int initZoomSector = 0;
   int initZoomInterval = 0;
+  bool xorbit = false;
   bool zoomSectorUsed = false;
   bool zoomIntervalUsed = false;
   int fileZoomInterval = 0;
   QVector<chid> channels;
   QTimer *pollTimer = nullptr;
+  QHash<int, QSocketNotifier *> caNotifiers;
   int timeInterval = 2000;
   bool caStarted = false;
   int nsymbols = 0;
@@ -2399,6 +2844,9 @@ private:
       arr.runSdev = 0.0;
       arr.runAvg = 0.0;
       arr.runMax = 0.0;
+      arr.runMaxSet = false;
+      arr.runSdevCount = 0;
+      arr.runAvgCount = 0;
     }
     for (AreaData &area : areas)
       area.tempclear = true;
@@ -2407,8 +2855,73 @@ private:
 
   void resetGraph()
   {
+    // Statistics follow the plotted quantity, which a menu choice can change.
+    for (ArrayData &arr : arrays)
+      updateArrayStatistics(arr);
     for (auto aw : areaWidgets)
       aw->refresh();
+  }
+
+  /**
+   * @brief Compute one update's statistics of what is plotted for an array.
+   *
+   * In difference mode the plotted values are the current values minus the
+   * difference set; with the reference displayed they are the current values
+   * minus the reference; otherwise they are the current values. Only points
+   * available in both operands and not excluded by Check Status count.
+   */
+  void updateArrayStatistics(ArrayData &arr)
+  {
+    const QVector<double> *subtract = nullptr;
+    const QVector<bool> *subtractAvail = nullptr;
+    if (::diffSet >= 0 && arr.saveVals[::diffSet].size() == arr.nvals) {
+      subtract = &arr.saveVals[::diffSet];
+      subtractAvail = &arr.saveAvail[::diffSet];
+    } else if (referenceLoaded && refOn && arr.refVals.size() == arr.nvals) {
+      subtract = &arr.refVals;
+      subtractAvail = &arr.refAvail;
+    }
+    QVector<double> values;
+    values.reserve(arr.nvals);
+    for (int i = 0; i < arr.nvals; ++i) {
+      if (!arr.available(i) || arr.excluded(i) ||
+          (subtractAvail && !setAvailable(*subtractAvail, i)))
+        continue;
+      if (!arr.logScale) {
+        values.append(subtract ? arr.vals[i] - (*subtract)[i] : arr.vals[i]);
+        continue;
+      }
+      // Log arrays: linear scaled values of positive points, or the plotted
+      // change in decades when a set or the reference is subtracted.
+      double v = arr.scaleFactor * arr.vals[i];
+      if (!(v > 0.0))
+        continue;
+      if (subtract) {
+        double s = arr.scaleFactor * (*subtract)[i];
+        if (!(s > 0.0))
+          continue;
+        values.append(std::log10(v) - std::log10(s));
+      } else {
+        values.append(v);
+      }
+    }
+    Statistics st = computeStatistics(values);
+    if (arr.logScale && !subtract) {
+      // Display log10 of each linear statistic, as legacy ADT did; a
+      // statistic that is not positive has no logarithm.
+      st.sdevValid = st.sdevValid && st.sdev > 0.0;
+      st.avgValid = st.avgValid && st.avg > 0.0;
+      st.maxValid = st.maxValid && st.max > 0.0;
+      st.sdev = st.sdevValid ? std::log10(st.sdev) : 0.0;
+      st.avg = st.avgValid ? std::log10(st.avg) : 0.0;
+      st.max = st.maxValid ? std::log10(st.max) : 0.0;
+    }
+    arr.sdev = st.sdev;
+    arr.avg = st.avg;
+    arr.maxVal = st.max;
+    arr.sdevValid = st.sdevValid;
+    arr.avgValid = st.avgValid;
+    arr.maxValid = st.maxValid;
   }
 
   void updateViewActions()
@@ -2427,67 +2940,108 @@ private:
       fillAct->setChecked(fillmaxmin);
   }
 
+public:
+  /**
+   * @brief Track the socket that Channel Access signals when replies wait.
+   */
+  void caFdChanged(int fd, bool opened)
+  {
+    if (opened) {
+      if (caNotifiers.contains(fd))
+        return;
+      auto notifier = new QSocketNotifier(fd, QSocketNotifier::Read, this);
+      connect(notifier, &QSocketNotifier::activated, this, [this]()
+      {
+        if (caStarted)
+          ca_poll();
+      });
+      caNotifiers.insert(fd, notifier);
+    } else {
+      delete caNotifiers.take(fd);
+    }
+  }
+
+private:
   void pollPvUpdate()
   {
     if (!caStarted)
       return;
     ca_poll();
+    // Keep at most one get outstanding per channel. A reading whose get has
+    // been outstanding longer than this is no longer current.
+    qint64 now = monotonicMs();
+    qint64 staleAfter = std::max<qint64>(2LL * timeInterval, 5000);
     for (ArrayData &arr : arrays) {
       for (int i = 0; i < arr.nvals; ++i) {
         if (!arr.chids[i] || ca_state(arr.chids[i]) != cs_conn) {
           arr.conn[i] = false;
           arr.vals[i] = 0.0;
+          arr.getIssued[i] = -1;
+        } else if (arr.getIssued[i] >= 0) {
+          if (now - arr.getIssued[i] > staleAfter) {
+            arr.conn[i] = false;
+            arr.vals[i] = 0.0;
+          }
+        } else if (ca_array_get_callback(DBR_DOUBLE, 1, arr.chids[i],
+            getCallback, &arr.cbData[i]) == ECA_NORMAL) {
+          arr.getIssued[i] = now;
+        } else {
+          arr.conn[i] = false;
+          arr.vals[i] = 0.0;
+        }
+      }
+      if (!arr.statusCheck)
+        continue;
+      for (int i = 0; i < arr.nvals; ++i) {
+        chid ch = arr.statusChids[i];
+        if (arr.statusVals[i] == STATUS_UNUSED)
+          continue;
+        if (!ch || ca_state(ch) != cs_conn) {
+          arr.statusVals[i] = STATUS_NOTCONN;
+          arr.statusIssued[i] = -1;
+        } else if (arr.statusIssued[i] >= 0) {
+          if (now - arr.statusIssued[i] > staleAfter)
+            arr.statusVals[i] = STATUS_NOTCONN;
+        } else if (ca_array_get_callback(DBR_ENUM, 1, ch, statusCallback,
+            &arr.statusCbData[i]) == ECA_NORMAL) {
+          arr.statusIssued[i] = now;
+        } else {
+          arr.statusVals[i] = STATUS_NOTCONN;
         }
       }
     }
+    ca_flush_io();
     for (ArrayData &arr : arrays) {
-      double sum = 0.0;
-      double sumsq = 0.0;
-      double maxv = 0.0;
-      int nconn = 0;
-      bool haveMax = false;
       for (int i = 0; i < arr.nvals; ++i) {
         if (!arr.conn[i])
           continue;
         double v = arr.vals[i];
-        sum += v;
-        sumsq += v * v;
-        if (!haveMax || std::fabs(v) > std::fabs(maxv)) {
-          maxv = v;
-          haveMax = true;
-        }
         if (v < arr.minVals[i])
           arr.minVals[i] = v;
         if (v > arr.maxVals[i])
           arr.maxVals[i] = v;
-        ++nconn;
       }
-      if (nconn > 0) {
-        arr.avg = sum / nconn;
-        arr.sdev = std::sqrt(sumsq / nconn - arr.avg * arr.avg);
-        arr.maxVal = maxv;
-      } else {
-        arr.avg = arr.sdev = arr.maxVal = 0.0;
-      }
+      updateArrayStatistics(arr);
     }
     nstat += 1.0;
     nstatTime += timeInterval;
     for (ArrayData &arr : arrays) {
-      arr.runSdev += arr.sdev;
-      arr.runAvg += arr.avg;
-      if (std::fabs(arr.maxVal) > std::fabs(arr.runMax))
+      if (arr.sdevValid) {
+        arr.runSdev += arr.sdev;
+        ++arr.runSdevCount;
+      }
+      if (arr.avgValid) {
+        arr.runAvg += arr.avg;
+        ++arr.runAvgCount;
+      }
+      if (arr.maxValid && (std::fabs(arr.maxVal) > std::fabs(arr.runMax) ||
+          (arr.logScale && !arr.runMaxSet))) {
         arr.runMax = arr.maxVal;
+        arr.runMaxSet = true;
+      }
     }
     for (auto aw : areaWidgets)
       aw->refresh();
-    for (ArrayData &arr : arrays) {
-      for (int i = 0; i < arr.nvals; ++i) {
-        if (arr.chids[i] && ca_state(arr.chids[i]) == cs_conn)
-          ca_array_get_callback(DBR_DOUBLE, 1, arr.chids[i], getCallback,
-            &arr.cbData[i]);
-      }
-    }
-    ca_flush_io();
   }
 
   void showStatus()
@@ -2507,11 +3061,16 @@ private:
       nstatTime / 60000.0, nsymbols);
     msg += "Array Nvals    SDEV     AVG     MAX (Accumulated)\n";
     for (const ArrayData &arr : arrays) {
-      msg += QString::asprintf("%5d %5d % 7.3f % 7.3f %7.3f\n",
-        arr.index + 1, arr.nvals,
-        nstat > 0 ? arr.runSdev / nstat : 0.0,
-        nstat > 0 ? arr.runAvg / nstat : 0.0,
-        arr.runMax);
+      auto accumulated = [](double sum, int count) {
+        if (count <= 0)
+          return QString::asprintf("% 7.3f", 0.0);
+        double v = sum / count;
+        return std::isfinite(v) ? QString::asprintf("% 7.3f", v) : QString("    n/a");
+      };
+      msg += QString::asprintf("%5d %5d ", arr.index + 1, arr.nvals) +
+        accumulated(arr.runSdev, arr.runSdevCount) + " " +
+        accumulated(arr.runAvg, arr.runAvgCount) + " " +
+        QString::asprintf("%7.3f\n", arr.runMax);
     }
     msg += "\nSlot  Time                      File\n";
     for (int i = 0; i < NSAVE; ++i) {
@@ -2582,6 +3141,7 @@ private:
     fprintf(file,
       "&parameter name=TimeStamp fixed_value=\"%s\" type=string &end\n",
       tbuf);
+    // The legacy plot format writes each count plus one (file.c writeplotfile).
     fprintf(file,
       "&parameter name=ADTNArrays type=short fixed_value=%d &end\n",
       static_cast<int>(arrays.size()) + 1);
@@ -2611,8 +3171,15 @@ private:
         arr.units.toUtf8().constData());
       fprintf(file, "%d     !ADTDisplayArea\n", arr.area->index + 1);
       for (int i = 0; i < arr.nvals; ++i) {
-        fprintf(file, "%d %s %.*g\n", i + 1,
-          arr.names[i].toUtf8().constData(),
+        // Unavailable points are left out; Index keeps the true positions.
+        if (nsave < 0 ? !arr.available(i) : !setAvailable(arr.saveAvail[nsave], i))
+          continue;
+        fprintf(file, "%d ", i + 1);
+        if (!writeSddsString(file, arr.names[i])) {
+          fclose(file);
+          return false;
+        }
+        fprintf(file, " %.*g\n",
           std::numeric_limits<double>::max_digits10, (*vals)[i]);
       }
     }
@@ -2621,10 +3188,12 @@ private:
 
   bool readRefFile(const QString &filename)
   {
+    QVector<QVector<double>> pendingValues(arrays.size());
+    QVector<QVector<bool>> pendingAvail(arrays.size());
     SDDS_TABLE table;
     QByteArray fname = filename.toUtf8();
     SDDS_ClearErrors();
-    if (!SDDS_InitializeInput(&table, fname.data())) {
+    if (!initializeSddsInput(&table, fname.data())) {
       QMessageBox::warning(this, "ADT",
         QString("Unable to read %1").arg(filename));
       if (SDDS_NumberOfErrors())
@@ -2640,8 +3209,18 @@ private:
       SDDS_Terminate(&table);
       return false;
     }
+    // ADTAvailable marks unavailable points; files without it are fully available.
+    int availCheck = SDDS_CheckColumn(&table, const_cast<char *>("ADTAvailable"),
+      NULL, SDDS_ANY_INTEGER_TYPE, NULL);
+    if (availCheck != SDDS_CHECK_OKAY && availCheck != SDDS_CHECK_NONEXISTENT) {
+      QMessageBox::warning(this, "ADT",
+        "ADTAvailable must be an integer column in reference file");
+      SDDS_Terminate(&table);
+      return false;
+    }
+    bool haveAvail = availCheck == SDDS_CHECK_OKAY;
     for (int ia = 0; ia < arrays.size(); ++ia) {
-      if (!SDDS_ReadTable(&table)) {
+      if (SDDS_ReadTable(&table) <= 0) {
         QMessageBox::warning(this, "ADT",
           QString("Could not get Data for array %1 in %2")
             .arg(ia + 1).arg(filename));
@@ -2649,9 +3228,8 @@ private:
         return false;
       }
       if (ia == 0) {
-        char *type = nullptr;
-        if (!SDDS_GetParameter(&table, const_cast<char *>("ADTFileType"),
-            &type) || strcmp(type, SNAPID)) {
+        char *type = readStringParameter(&table, "ADTFileType");
+        if (!type || strcmp(type, SNAPID)) {
           QMessageBox::warning(this, "ADT",
             QString("Not a valid ADT Reference/Snapshot file: %1")
               .arg(filename));
@@ -2661,7 +3239,7 @@ private:
         }
         SDDS_Free(type);
       }
-      int nvals = SDDS_CountRowsOfInterest(&table);
+      int64_t nvals = SDDS_CountRowsOfInterest(&table);
       if (nvals != arrays[ia].nvals) {
         QMessageBox::warning(this, "ADT",
           QString("Wrong number of items [%1] for array %2 in %3")
@@ -2688,7 +3266,21 @@ private:
         SDDS_Terminate(&table);
         return false;
       }
-      arrays[ia].refVals.resize(arrays[ia].nvals);
+      int32_t *rawavail = nullptr;
+      if (haveAvail) {
+        rawavail = SDDS_GetColumnInLong(&table, const_cast<char *>("ADTAvailable"));
+        if (!rawavail) {
+          QMessageBox::warning(this, "ADT",
+            QString("Could not get ADTAvailable for array %1 in %2")
+              .arg(ia + 1).arg(filename));
+          freeSddsStrings(nvals, rawnames);
+          freeSddsStrings(nvals, rawvalues);
+          SDDS_Terminate(&table);
+          return false;
+        }
+      }
+      pendingValues[ia].resize(arrays[ia].nvals);
+      pendingAvail[ia].fill(true, arrays[ia].nvals);
       for (int i = 0; i < nvals; ++i) {
         if (QString(rawnames[i]) != arrays[ia].names[i]) {
           QMessageBox::warning(this, "ADT",
@@ -2696,15 +3288,35 @@ private:
               .arg(rawnames[i]).arg(filename));
           freeSddsStrings(nvals, rawnames);
           freeSddsStrings(nvals, rawvalues);
+          SDDS_Free(rawavail);
           SDDS_Terminate(&table);
           return false;
         }
-        arrays[ia].refVals[i] = atof(rawvalues[i]);
+        if (rawavail && !rawavail[i]) {
+          pendingValues[ia][i] = 0.0;
+          pendingAvail[ia][i] = false;
+          continue;
+        }
+        if (!parseSnapshotValue(rawvalues[i], pendingValues[ia][i])) {
+          QMessageBox::warning(this, "ADT",
+            QString("Invalid value for %1 in %2").arg(rawnames[i]).arg(filename));
+          freeSddsStrings(nvals, rawnames);
+          freeSddsStrings(nvals, rawvalues);
+          SDDS_Free(rawavail);
+          SDDS_Terminate(&table);
+          return false;
+        }
       }
       freeSddsStrings(nvals, rawnames);
       freeSddsStrings(nvals, rawvalues);
+      SDDS_Free(rawavail);
     }
-    SDDS_Terminate(&table);
+    if (!SDDS_Terminate(&table))
+      return false;
+    for (int ia = 0; ia < arrays.size(); ++ia) {
+      arrays[ia].refVals = pendingValues[ia];
+      arrays[ia].refAvail = pendingAvail[ia];
+    }
     if (SDDS_NumberOfErrors())
       SDDS_PrintErrors(stderr, SDDS_VERBOSE_PrintErrors);
     return true;
@@ -2712,10 +3324,15 @@ private:
 
   bool readSnapFile(const QString &filename, int nsave)
   {
+    if (nsave < 0 || nsave >= NSAVE)
+      return false;
+    QVector<QVector<double>> pendingValues(arrays.size());
+    QVector<QVector<bool>> pendingAvail(arrays.size());
+    QString pendingTime;
     SDDS_TABLE table;
     QByteArray fname = filename.toUtf8();
     SDDS_ClearErrors();
-    if (!SDDS_InitializeInput(&table, fname.data())) {
+    if (!initializeSddsInput(&table, fname.data())) {
       QMessageBox::warning(this, "ADT",
         QString("Unable to read %1").arg(filename));
       if (SDDS_NumberOfErrors())
@@ -2731,8 +3348,18 @@ private:
       SDDS_Terminate(&table);
       return false;
     }
+    // ADTAvailable marks unavailable points; files without it are fully available.
+    int availCheck = SDDS_CheckColumn(&table, const_cast<char *>("ADTAvailable"),
+      NULL, SDDS_ANY_INTEGER_TYPE, NULL);
+    if (availCheck != SDDS_CHECK_OKAY && availCheck != SDDS_CHECK_NONEXISTENT) {
+      QMessageBox::warning(this, "ADT",
+        "ADTAvailable must be an integer column in snapshot file");
+      SDDS_Terminate(&table);
+      return false;
+    }
+    bool haveAvail = availCheck == SDDS_CHECK_OKAY;
     for (int ia = 0; ia < arrays.size(); ++ia) {
-      if (!SDDS_ReadTable(&table)) {
+      if (SDDS_ReadTable(&table) <= 0) {
         QMessageBox::warning(this, "ADT",
           QString("Could not get Data for array %1 in %2")
             .arg(ia + 1).arg(filename));
@@ -2740,9 +3367,8 @@ private:
         return false;
       }
       if (ia == 0) {
-        char *type = nullptr;
-        if (!SDDS_GetParameter(&table, const_cast<char *>("ADTFileType"),
-            &type) || strcmp(type, SNAPID)) {
+        char *type = readStringParameter(&table, "ADTFileType");
+        if (!type || strcmp(type, SNAPID)) {
           QMessageBox::warning(this, "ADT",
             QString("Not a valid ADT Reference/Snapshot file: %1")
               .arg(filename));
@@ -2751,15 +3377,13 @@ private:
           return false;
         }
         SDDS_Free(type);
-        char *time = nullptr;
-        if (SDDS_GetParameter(&table, const_cast<char *>("TimeStamp"), &time)) {
-          saveTime[nsave] = QString::fromUtf8(time);
+        char *time = readStringParameter(&table, "TimeStamp");
+        if (time) {
+          pendingTime = QString::fromUtf8(time);
           SDDS_Free(time);
-        } else {
-          saveTime[nsave].clear();
         }
       }
-      int nvals = SDDS_CountRowsOfInterest(&table);
+      int64_t nvals = SDDS_CountRowsOfInterest(&table);
       if (nvals != arrays[ia].nvals) {
         QMessageBox::warning(this, "ADT",
           QString("Wrong number of items [%1] for array %2 in %3")
@@ -2786,7 +3410,21 @@ private:
         SDDS_Terminate(&table);
         return false;
       }
-      arrays[ia].saveVals[nsave].resize(arrays[ia].nvals);
+      int32_t *rawavail = nullptr;
+      if (haveAvail) {
+        rawavail = SDDS_GetColumnInLong(&table, const_cast<char *>("ADTAvailable"));
+        if (!rawavail) {
+          QMessageBox::warning(this, "ADT",
+            QString("Could not get ADTAvailable for array %1 in %2")
+              .arg(ia + 1).arg(filename));
+          freeSddsStrings(nvals, rawnames);
+          freeSddsStrings(nvals, rawvalues);
+          SDDS_Terminate(&table);
+          return false;
+        }
+      }
+      pendingValues[ia].resize(arrays[ia].nvals);
+      pendingAvail[ia].fill(true, arrays[ia].nvals);
       for (int i = 0; i < nvals; ++i) {
         if (QString(rawnames[i]) != arrays[ia].names[i]) {
           QMessageBox::warning(this, "ADT",
@@ -2794,15 +3432,36 @@ private:
               .arg(rawnames[i]).arg(filename));
           freeSddsStrings(nvals, rawnames);
           freeSddsStrings(nvals, rawvalues);
+          SDDS_Free(rawavail);
           SDDS_Terminate(&table);
           return false;
         }
-        arrays[ia].saveVals[nsave][i] = atof(rawvalues[i]);
+        if (rawavail && !rawavail[i]) {
+          pendingValues[ia][i] = 0.0;
+          pendingAvail[ia][i] = false;
+          continue;
+        }
+        if (!parseSnapshotValue(rawvalues[i], pendingValues[ia][i])) {
+          QMessageBox::warning(this, "ADT",
+            QString("Invalid value for %1 in %2").arg(rawnames[i]).arg(filename));
+          freeSddsStrings(nvals, rawnames);
+          freeSddsStrings(nvals, rawvalues);
+          SDDS_Free(rawavail);
+          SDDS_Terminate(&table);
+          return false;
+        }
       }
       freeSddsStrings(nvals, rawnames);
       freeSddsStrings(nvals, rawvalues);
+      SDDS_Free(rawavail);
     }
-    SDDS_Terminate(&table);
+    if (!SDDS_Terminate(&table))
+      return false;
+    for (int ia = 0; ia < arrays.size(); ++ia) {
+      arrays[ia].saveVals[nsave] = pendingValues[ia];
+      arrays[ia].saveAvail[nsave] = pendingAvail[ia];
+    }
+    saveTime[nsave] = pendingTime;
     if (SDDS_NumberOfErrors())
       SDDS_PrintErrors(stderr, SDDS_VERBOSE_PrintErrors);
     saveFilename[nsave] = filename;
@@ -2868,6 +3527,7 @@ private:
     fprintf(file, "&column name=Lineage type=string &end\n");
     fprintf(file, "&column name=Count type=long &end\n");
     fprintf(file, "&column name=ValueString type=string &end\n");
+    fprintf(file, "&column name=ADTAvailable type=short &end\n");
     fprintf(file,
       "&data mode=ascii no_row_counts=1 additional_header_lines=1 &end\n");
     for (const ArrayData &arr : arrays) {
@@ -2881,9 +3541,15 @@ private:
       fprintf(file, "%s (%s)\n", arr.heading.toUtf8().constData(),
         arr.units.toUtf8().constData());
       for (int i = 0; i < arr.nvals; ++i) {
-        fprintf(file, "%s pv - 1 %.*g\n",
-          arr.names[i].toUtf8().constData(),
-          std::numeric_limits<double>::max_digits10, (*vals)[i]);
+        if (!writeSddsString(file, arr.names[i])) {
+          fclose(file);
+          return false;
+        }
+        // Unavailable points keep the 0 that older readers have always seen.
+        bool avail = nsave < 0 ? arr.available(i) : setAvailable(arr.saveAvail[nsave], i);
+        fprintf(file, " pv - 1 %.*g %d\n",
+          std::numeric_limits<double>::max_digits10, avail ? (*vals)[i] : 0.0,
+          avail ? 1 : 0);
       }
     }
     if (!commitExport(file, filename)) {
@@ -2959,6 +3625,26 @@ private:
       QMessageBox::warning(this, "ADT", "There are no PV's defined");
       return;
     }
+    launchPlot(-1);
+  }
+
+  /**
+   * @brief Write a plot file and show it with sddsplot in a detached shell.
+   *
+   * The plot outlives ADT and does not block it. The shell receives the file
+   * name as a positional parameter, never inside its command text, and
+   * removes the file when sddsplot exits. Errors from a running sddsplot go
+   * to its own standard error.
+   *
+   * @param nsave Stored set index, or -1 for the current values.
+   */
+  void launchPlot(int nsave)
+  {
+    if (QStandardPaths::findExecutable("sddsplot").isEmpty()) {
+      QMessageBox::warning(this, "ADT",
+        "Unable to plot: sddsplot was not found on the PATH");
+      return;
+    }
     QTemporaryFile tmp(QDir::tempPath() + "/ADTPlotXXXXXX.sdds");
     tmp.setAutoRemove(false);
     if (!tmp.open()) {
@@ -2967,15 +3653,19 @@ private:
     }
     QString fname = tmp.fileName();
     tmp.close();
-    if (!writePlotFile(fname)) {
+    if (!writePlotFile(fname, nsave)) {
       QFile::remove(fname);
       return;
     }
-    QString cmd = QString(
+    const QString script =
       "sddsplot -graph=sym,connect -layout=1,2 -split=page -sep "
-      "-ylabel=@TimeStamp -xlabel=Index -column=Index,Value \"%1\" "
-      "-title=@ADTScreenTitle -end ; rm \"%1\"").arg(fname);
-    QProcess::startDetached("/bin/sh", QStringList() << "-c" << cmd);
+      "-ylabel=@TimeStamp -xlabel=Index -column=Index,Value \"$1\" "
+      "-title=@ADTScreenTitle -end ; rm -f \"$1\"";
+    if (!QProcess::startDetached("/bin/sh",
+        QStringList() << "-c" << script << "adt-plot" << fname)) {
+      QMessageBox::warning(this, "ADT", "Unable to start /bin/sh to run sddsplot");
+      QFile::remove(fname);
+    }
   }
 
   void plotSaved(int n)
@@ -2994,30 +3684,17 @@ private:
         return;
       }
     }
-    QTemporaryFile tmp(QDir::tempPath() + "/ADTPlotXXXXXX.sdds");
-    tmp.setAutoRemove(false);
-    if (!tmp.open()) {
-      QMessageBox::warning(this, "ADT", "Unable to create temp file");
-      return;
-    }
-    QString fname = tmp.fileName();
-    tmp.close();
-    if (!writePlotFile(fname, idx)) {
-      QFile::remove(fname);
-      return;
-    }
-    QString cmd = QString(
-      "sddsplot -graph=sym,connect -layout=1,2 -split=page -sep "
-      "-ylabel=@TimeStamp -xlabel=Index -column=Index,Value \"%1\" "
-      "-title=@ADTScreenTitle -end ; rm \"%1\"").arg(fname);
-    QProcess::startDetached("/bin/sh", QStringList() << "-c" << cmd);
+    launchPlot(idx);
   }
 
   void loadPvFile(const QString &file)
   {
+    SDDS_ClearErrors();
     pvFilename = file;
     if (pollTimer)
       pollTimer->stop();
+    if (checkStatusMenu)
+      checkStatusMenu->setEnabled(false);
     timeInterval = 2000;
 
     if (caStarted) {
@@ -3046,7 +3723,10 @@ private:
       saveFilename[i].clear();
     }
     refFilename.clear();
+    latFilename.clear();
     referenceLoaded = false;
+    ::displaySet = -1;
+    ::diffSet = -1;
     QString pendingReferenceFile;
 
     if (ca_context_create(ca_disable_preemptive_callback) != ECA_NORMAL) {
@@ -3054,10 +3734,15 @@ private:
       return;
     }
     caStarted = true;
+    // Service Channel Access whenever its receive threads have replies, as
+    // legacy ADT did through its file descriptor manager. Polling only at
+    // the update interval lets a large layout's replies queue for several
+    // intervals.
+    ca_add_fd_registration(caFdRegistration, this);
 
     SDDS_TABLE table;
     QByteArray fname = file.toUtf8();
-    if (!SDDS_InitializeInput(&table, fname.data())) {
+    if (!initializeSddsInput(&table, fname.data())) {
       QMessageBox::warning(this, "ADT", "Unable to read PV file:\n" + file);
       ca_context_destroy();
       channels.clear();
@@ -3065,35 +3750,76 @@ private:
       return;
     }
 
+    // A failed load must not leave partially populated arrays for the next
+    // timer or menu action to use.
+    auto failLoad = [&](const QString &message) {
+      SDDS_Terminate(&table);
+      // Clear channels before destroying the context, as a reload does;
+      // destroying the context alone leaks their names.
+      for (chid ch : channels)
+        ca_clear_channel(ch);
+      ca_context_destroy();
+      channels.clear();
+      caStarted = false;
+      arrays.clear();
+      areas.clear();
+      latNames.clear(); latS.clear(); latLen.clear(); latHeight.clear();
+      nsect = 0;
+      stotal = 0.0;
+      latRing = false;
+      QMessageBox::warning(this, "ADT", message);
+    };
+    const char *stringParameters[] = {"ADTFileType", "ADTLatticeFile",
+      "ADTReferenceFile", "ADTColor", "ADTHeading", "ADTUnits"};
+    for (const char *name : stringParameters) {
+      int index = SDDS_GetParameterIndex(&table, const_cast<char *>(name));
+      if (index >= 0 && SDDS_GetParameterType(&table, index) != SDDS_STRING) {
+        failLoad(QString("PV file parameter %1 must be a string").arg(name));
+        return;
+      }
+    }
+    if (SDDS_CheckColumn(&table, const_cast<char *>("ControlName"), NULL,
+        SDDS_STRING, NULL) != SDDS_CHECK_OKAY) {
+      failLoad("PV file requires a string ControlName column");
+      return;
+    }
+    // A StatusName column enables status checking unless -x was given, as in
+    // legacy ADT.
+    bool statusColumn = false;
+    if (!xorbit) {
+      int statusCheck = SDDS_CheckColumn(&table, const_cast<char *>("StatusName"),
+        NULL, SDDS_STRING, NULL);
+      if (statusCheck == SDDS_CHECK_WRONGTYPE) {
+        failLoad("PV file StatusName column must be a string column");
+        return;
+      }
+      statusColumn = statusCheck == SDDS_CHECK_OKAY;
+    }
+
     bool first = true;
     bool oneAreaPerArray = false;
     int iarray;
     int narrays = 0;
     int nareas = 0;
+    int pages = 0;
     int32_t templong = 0;
+    QStringList missingS;  // PVs without a lattice s value, reported once
 
     while ((iarray = SDDS_ReadTable(&table)) > 0) {
+      ++pages;
       iarray--;
       if (first) {
         char *type = NULL;
         if (!SDDS_GetParameter(&table, const_cast<char *>("ADTFileType"), &type) ||
             strcmp(type, PVID)) {
-          QMessageBox::warning(this, "ADT", "Not a valid ADT PV file");
           SDDS_Free(type);
-          SDDS_Terminate(&table);
-          ca_context_destroy();
-          channels.clear();
-          caStarted = false;
+          failLoad("Not a valid ADT PV file");
           return;
         }
         SDDS_Free(type);
         if (!SDDS_GetParameterAsLong(&table, const_cast<char *>("ADTNArrays"),
             &templong)) {
-          QMessageBox::warning(this, "ADT", "Missing ADTNArrays parameter");
-          SDDS_Terminate(&table);
-          ca_context_destroy();
-          channels.clear();
-          caStarted = false;
+          failLoad("Missing ADTNArrays parameter");
           return;
         }
         narrays = templong;
@@ -3103,11 +3829,15 @@ private:
           templong = narrays;
         }
         nareas = templong;
+        if (narrays <= 0 || nareas <= 0) {
+          failLoad("ADTNArrays and ADTNAreas must be positive");
+          return;
+        }
         arrays.resize(narrays);
         areas.resize(nareas);
         if (SDDS_GetParameterAsLong(&table,
             const_cast<char *>("ADTTimeInterval"), &templong))
-          timeInterval = static_cast<int>(templong);
+          timeInterval = templong > 0 ? static_cast<int>(templong) : 2000;
         if (SDDS_GetParameterAsLong(&table,
             const_cast<char *>("ADTZoomInterval"), &templong)) {
           int interval = static_cast<int>(templong);
@@ -3210,19 +3940,28 @@ private:
         arr.scaleFactor = sf;
       else
         arr.scaleFactor = 1.0;
+      if (!std::isfinite(arr.scaleFactor)) {
+        failLoad("ADTScaleFactor must be finite");
+        return;
+      }
 
       if (SDDS_GetParameterAsLong(&table,
           const_cast<char *>("ADTZoomArea"), &templong))
         arr.zoom = templong != 0;
       else
         arr.zoom = false;
+      if (SDDS_GetParameterAsLong(&table,
+          const_cast<char *>("ADTLogScale"), &templong))
+        arr.logScale = templong != 0;
+      else
+        arr.logScale = false;
 
       int iarea;
       if (oneAreaPerArray)
         iarea = iarray;
       else {
         if (SDDS_GetParameterAsLong(&table, const_cast<char *>("ADTDisplayArea"), &templong))
-          iarea = static_cast<int>(templong) - 1;
+          iarea = templong > 0 ? static_cast<int>(templong) - 1 : -1;
         else
           iarea = iarray;
       }
@@ -3240,6 +3979,12 @@ private:
         double upd;
         if (!SDDS_GetParameterAsDouble(&table, const_cast<char *>("ADTUnitsPerDiv"), &upd))
           upd = 1.0;
+        // Any ADTUnitsPerDiv selects the nearest scale, as in legacy ADT; values
+        // at or below the smallest scale select it.
+        if (!std::isfinite(center)) {
+          failLoad("ADTCenterVal must be finite");
+          return;
+        }
         int iscale = 0;
         while (iscale < NSCALES && upd > scale[iscale])
           ++iscale;
@@ -3251,7 +3996,12 @@ private:
         area.initialized = true;
       }
 
-      int rows = SDDS_CountRowsOfInterest(&table);
+      int64_t rowCount = SDDS_CountRowsOfInterest(&table);
+      if (rowCount <= 0 || rowCount > std::numeric_limits<int>::max()) {
+        failLoad("PV arrays must contain a positive, representable row count");
+        return;
+      }
+      int rows = static_cast<int>(rowCount);
       arr.nvals = rows;
       arr.names.clear();
       arr.vals.fill(0.0, rows);
@@ -3261,14 +4011,11 @@ private:
       arr.conn.fill(false, rows);
       arr.chids.clear();
       arr.cbData.resize(rows);
+      arr.getIssued.fill(-1, rows);
 
       char **names = (char **)SDDS_GetColumn(&table, const_cast<char *>("ControlName"));
       if (!names) {
-        QMessageBox::warning(this, "ADT", "PV file missing ControlName column");
-        SDDS_Terminate(&table);
-        ca_context_destroy();
-        channels.clear();
-        caStarted = false;
+        failLoad("Unable to read PV ControlName column");
         return;
       }
       for (int i = 0; i < rows; ++i) {
@@ -3286,6 +4033,35 @@ private:
         SDDS_Free(names[i]);
       }
       SDDS_Free(names);
+      arr.statusCheck = statusColumn;
+      arr.statusChids.clear();
+      arr.statusVals.fill(STATUS_UNUSED, rows);
+      arr.statusCbData.resize(rows);
+      arr.statusIssued.fill(-1, rows);
+      if (statusColumn) {
+        char **statusNames = (char **)SDDS_GetColumn(&table,
+          const_cast<char *>("StatusName"));
+        if (!statusNames) {
+          failLoad("Unable to read PV StatusName column");
+          return;
+        }
+        for (int i = 0; i < rows; ++i) {
+          chid ch = 0;
+          // A status name of "-" marks a point that is not checked.
+          if (strcmp(statusNames[i], "-")) {
+            arr.statusVals[i] = STATUS_NOTCONN;
+            if (ca_create_channel(statusNames[i], NULL, NULL, 0, &ch) == ECA_NORMAL)
+              channels.append(ch);
+            else
+              ch = 0;
+          }
+          arr.statusChids.append(ch);
+          arr.statusCbData[i].arr = &arr;
+          arr.statusCbData[i].index = i;
+          SDDS_Free(statusNames[i]);
+        }
+        SDDS_Free(statusNames);
+      }
       if (!latS.isEmpty()) {
         int jstart = 0;
         for (int i = 0; i < rows; ++i) {
@@ -3300,14 +4076,25 @@ private:
             }
           }
           if (!found)
-            QMessageBox::warning(this, "ADT",
-              QString("Did not find an s value for %1 in array %2")
-              .arg(arr.names[i]).arg(iarray + 1));
+            missingS << QString("%1 in array %2").arg(arr.names[i]).arg(iarray + 1);
         }
       }
     }
 
+    if (iarray != -1 || first || pages != narrays) {
+      failLoad("PV file is malformed, truncated, or does not match ADTNArrays");
+      return;
+    }
     SDDS_Terminate(&table);
+    if (!missingS.isEmpty()) {
+      const int shown = 20;
+      QString list = QStringList(missingS.mid(0, shown)).join("\n");
+      if (missingS.size() > shown)
+        list += QString("\n... and %1 more").arg(missingS.size() - shown);
+      QMessageBox::warning(this, "ADT",
+        QString("Did not find an s value for %1 PVs in %2:\n%3")
+        .arg(missingS.size()).arg(latFilename).arg(list));
+    }
 
     if (ca_pend_io(1.0) == ECA_TIMEOUT) {
       QMessageBox *timeoutBox = new QMessageBox(QMessageBox::Warning, "ADT",
@@ -3317,49 +4104,60 @@ private:
       QTimer::singleShot(3000, timeoutBox, &QMessageBox::accept);
     }
 
-    for (ArrayData &arr : arrays) {
+    QVector<QVector<dbr_enum_t>> statusRaw(arrays.size());
+    QVector<QVector<bool>> statusRead(arrays.size());
+    for (int ia = 0; ia < arrays.size(); ++ia) {
+      ArrayData &arr = arrays[ia];
       for (int i = 0; i < arr.nvals; ++i) {
         if (arr.chids[i] && ca_state(arr.chids[i]) == cs_conn) {
-          ca_array_get(DBR_DOUBLE, 1, arr.chids[i], &arr.vals[i]);
-          arr.conn[i] = true;
+          arr.conn[i] = ca_array_get(DBR_DOUBLE, 1, arr.chids[i],
+            &arr.vals[i]) == ECA_NORMAL;
         } else {
           arr.vals[i] = 0.0;
           arr.conn[i] = false;
         }
       }
+      if (!arr.statusCheck)
+        continue;
+      statusRaw[ia].fill(0, arr.nvals);
+      statusRead[ia].fill(false, arr.nvals);
+      for (int i = 0; i < arr.nvals; ++i) {
+        chid ch = arr.statusChids[i];
+        if (ch && ca_state(ch) == cs_conn)
+          statusRead[ia][i] = ca_array_get(DBR_ENUM, 1, ch,
+            &statusRaw[ia][i]) == ECA_NORMAL;
+      }
     }
-    ca_pend_io(1.0);
+    bool initialReadsComplete = ca_pend_io(1.0) == ECA_NORMAL;
+    // Synchronous gets do not identify which individual reads timed out.
+    // Keep failed or nonfinite readings unavailable until a valid callback.
+    for (int ia = 0; ia < arrays.size(); ++ia) {
+      ArrayData &arr = arrays[ia];
+      for (int i = 0; i < arr.nvals; ++i) {
+        if (!initialReadsComplete || !arr.conn[i] || !std::isfinite(arr.vals[i])) {
+          arr.conn[i] = false;
+          arr.vals[i] = 0.0;
+        }
+        if (arr.statusCheck && arr.statusVals[i] != STATUS_UNUSED)
+          arr.statusVals[i] = initialReadsComplete && statusRead[ia][i] ?
+            static_cast<short>(statusRaw[ia][i]) : STATUS_NOTCONN;
+      }
+    }
 
     for (ArrayData &arr : arrays) {
-      double sum = 0.0;
-      double sumsq = 0.0;
-      double maxv = 0.0;
-      int nconn = 0;
-      bool haveMax = false;
       for (int i = 0; i < arr.nvals; ++i) {
         if (!arr.conn[i])
           continue;
-        double v = arr.vals[i];
-        sum += v;
-        sumsq += v * v;
-        if (!haveMax || std::fabs(v) > std::fabs(maxv)) {
-          maxv = v;
-          haveMax = true;
-        }
-        arr.minVals[i] = v;
-        arr.maxVals[i] = v;
-        ++nconn;
+        arr.minVals[i] = arr.vals[i];
+        arr.maxVals[i] = arr.vals[i];
       }
-      if (nconn > 0) {
-        arr.avg = sum / nconn;
-        arr.sdev = std::sqrt(sumsq / nconn - arr.avg * arr.avg);
-        arr.maxVal = maxv;
-      } else {
-        arr.avg = arr.sdev = arr.maxVal = 0.0;
-      }
+      updateArrayStatistics(arr);
       arr.runSdev = 0.0;
       arr.runAvg = 0.0;
       arr.runMax = 0.0;
+      arr.runMaxSet = false;
+      arr.runSdevCount = 0;
+      arr.runAvgCount = 0;
     }
 
     nsymbols = latNames.size();
@@ -3448,10 +4246,23 @@ private:
       }
     }
 
+    // A startup -f file is loaded before the Options menu exists.
+    if (checkStatusMenu)
+      checkStatusMenu->setEnabled(statusColumn);
     setWindowTitle("ADT - " + QFileInfo(file).fileName());
     pollTimer->start(timeInterval);
   }
 };
+
+/**
+ * @brief Channel Access file descriptor registration callback.
+ *
+ * Called from ca_create_channel and ca_context_destroy on the main thread.
+ */
+static void caFdRegistration(void *arg, int fd, int opened)
+{
+  static_cast<MainWindow *>(arg)->caFdChanged(fd, opened != 0);
+}
 
 static void usage(const char *prog) {
   fprintf(stderr,
@@ -3461,13 +4272,43 @@ static void usage(const char *prog) {
     "  -s <center_sector>      set initial zoomed on sector\n"
     "  -z <number_of_sectors>  set initial zoom range\n"
     "  -d                      enable diff mode\n"
-    "  -x                      use Xorbit directories\n"
-    "  -h, -?                  show this help message and exit\n",
+    "  -x                      use Xorbit directories; no status checking\n"
+    "  -h, -?                  show this help message and exit\n"
+    "Options may also begin with /. Qt options such as -display are accepted.\n"
+    "Exit status: 0 after help; 8 for an unknown option, a missing operand,\n"
+    "a non-integer -s or -z value, or an unexpected argument.\n",
     prog);
+}
+
+/**
+ * @brief Match a one-letter option written as -x or /x.
+ */
+static bool isOption(const char *arg, char letter)
+{
+  return (arg[0] == '-' || arg[0] == '/') && arg[1] == letter && arg[2] == '\0';
+}
+
+/**
+ * @brief Whether an option takes an operand.
+ */
+static bool takesOperand(const char *arg)
+{
+  return isOption(arg, 'a') || isOption(arg, 'f') || isOption(arg, 's') ||
+    isOption(arg, 'z');
 }
 
 int main(int argc, char **argv)
 {
+  // Help needs no display, so look for it before QApplication opens one.
+  for (int i = 1; i < argc; ++i) {
+    if (takesOperand(argv[i])) {
+      ++i;
+    } else if (isOption(argv[i], 'h') || isOption(argv[i], '?')) {
+      usage(argv[0]);
+      return 0;
+    }
+  }
+  // QApplication removes the Qt options, such as -display and -style.
   QApplication app(argc, argv);
   QString startPv;
   QString homeOverride;
@@ -3476,30 +4317,40 @@ int main(int argc, char **argv)
   int zoomInt = 0;
   bool diffMode = false;
   bool xorbitMode = false;
-  bool showHelp = false;
-  QStringList args = app.arguments();
-  for (int i = 1; i < args.size(); ++i) {
-    const QString &arg = args.at(i);
-    if ((arg == "-a" || arg == "/a") && i + 1 < args.size()) {
-      homeOverride = args.at(++i);
-      homeSpecified = true;
-    } else if ((arg == "-f" || arg == "/f") && i + 1 < args.size()) {
-      startPv = args.at(++i);
-    } else if ((arg == "-s" || arg == "/s") && i + 1 < args.size()) {
-      zoomSect = args.at(++i).toInt();
-    } else if ((arg == "-z" || arg == "/z") && i + 1 < args.size()) {
-      zoomInt = args.at(++i).toInt();
-    } else if (arg == "-d" || arg == "/d") {
-      diffMode = true;
-    } else if (arg == "-x" || arg == "/x") {
-      xorbitMode = true;
-    } else if (arg == "-h" || arg == "/h" || arg == "-?" || arg == "/?") {
-      showHelp = true;
-    }
-  }
-  if (showHelp) {
+  // Reject what legacy ADT rejected, with its exit status 8.
+  auto invalid = [&argv](const QString &option) {
+    fprintf(stderr, "Invalid option %s\n", option.toLocal8Bit().constData());
     usage(argv[0]);
-    return 0;
+    return 8;
+  };
+  for (int i = 1; i < argc; ++i) {
+    const char *arg = argv[i];
+    if (takesOperand(arg)) {
+      if (i + 1 >= argc)
+        return invalid(arg);
+      QString value = QString::fromLocal8Bit(argv[++i]);
+      if (isOption(arg, 'a')) {
+        homeOverride = value;
+        homeSpecified = true;
+      } else if (isOption(arg, 'f')) {
+        startPv = value;
+      } else {
+        bool ok = false;
+        int number = value.toInt(&ok);
+        if (!ok)
+          return invalid(QString("%1 %2").arg(arg, value));
+        if (isOption(arg, 's'))
+          zoomSect = number;
+        else
+          zoomInt = number;
+      }
+    } else if (isOption(arg, 'd')) {
+      diffMode = true;
+    } else if (isOption(arg, 'x')) {
+      xorbitMode = true;
+    } else {
+      return invalid(arg);
+    }
   }
   MainWindow win(homeOverride, homeSpecified, startPv, zoomSect, zoomInt,
     xorbitMode);

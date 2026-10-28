@@ -36,8 +36,6 @@ PTB
 Booster
 "booster.bpm.pv"      "BOOSTER Horizontal and Vertical BPM's"
 "booster.bpmcor.pv"   "BOOSTER BPM's and Corrector Setpoints"
-"booster.bpmhcor.pv"  "BOOSTER BPM's and Horizontal Corrector Setpoints"
-"booster.bpmvcor.pv"  "BOOSTER BPM's and Vertical Corrector Setpoints"
 
 SR
 "sr.bpm.pv"          "SR Horizontal and Vertical BPM's"

@@ -8,6 +8,9 @@
   <title>ADT Help</title>
 </head>
 <body>
+  <p><strong>Note:</strong> This historical manual describes the
+  legacy Motif interface of ADT. For the Qt application, which is
+  the default build, see <a href="../README.md">README.md</a>.</p>
   <h1>Array Display Tool ADT<br>
   Reference Manual<br></h1>
   <h2>Kenneth Evans, Jr.<br>
@@ -86,11 +89,12 @@
   <h1><a name="overview" id="overview">Overview</a></h1>Array
   Display Tool (ADT) is a graphical program to display arrays of
   process variables from the Advanced Photon Source control system.
-  It uses a Qt-based interface, which is the preferred version. The
-  legacy Motif<a href="#fn0">[1]</a> interface is deprecated. A
-  typical use is to display the horizontal and vertical monitor
-  readings. A picture of the ADT interface is <a href=
-  "adt.gif">here</a>.
+  ADT now builds with a Qt-based interface by default; this manual
+  describes the deprecated legacy Motif<a href="#fn0">[1]</a>
+  interface, and <a href="../README.md">README.md</a> describes the
+  Qt application. A typical use is to display the horizontal and
+  vertical monitor readings. A picture of the legacy Motif interface
+  is <a href="adt.gif">here</a>.
   <p>The screen layout, apart from the menu bar, consists of two
   types of graphic areas in which the values for the arrays of
   process variables are shown: <a href="#displayareas">Display</a>
@@ -597,7 +601,7 @@
   be in the <b>ADTPVDirectory</b>. If these columns are not there,
   there will be no options in the File/Load menu except Custom.</p>
   <p>An example configuration file should be located in <a href=
-  "adtrc">$ADTHOME/adtrc</a>.</p>
+  "../src/adtrc">$ADTHOME/adtrc</a>.</p>
   <p><b>Parameter Summary</b></p>
   <ul>
       <li>ADTHelpFile, string, fixed_value</li>
@@ -628,7 +632,7 @@
   be made. These can then be read in from the <a href=
   "#filemenu">File/Load/Custom</a> menu. An example PV file should
   be located in <a href=
-  "pv/par.bpm.pv">$ADTHOME/pv/par.bpm.pv</a>.</p>
+  "../pv/par.bpm.pv">$ADTHOME/pv/par.bpm.pv</a>.</p>
   <p>There are three types of SDDS parameters that appear in a PV
   file:</p>
   <ul>
@@ -770,7 +774,7 @@
   in the Zoom Window. There should only be one lattice file for
   each ring so you should have little need to make one yourself. An
   example lattice file should be located in <a href=
-  "pv/par.lat">$ADTHOME/pv/par.lat</a>.
+  "../pv/par.lat">$ADTHOME/pv/par.lat</a>.
   <p>The parameters that must be specified in a Lattice file
   are:</p>
   <p><b>ADTFileType</b>: A required, fixed value of type string
@@ -843,7 +847,7 @@
   example. Corrector set points can.) You can save snapshot files
   in your own directories. An example snapshot file should be
   located in <a href=
-  "snap/par.bpm.ref.snap">$ADTHOME/snap/par.bpm.snap</a>.</p>
+  "../snap/par.bpm.ref.snap">$ADTHOME/snap/par.bpm.snap</a>.</p>
   <p>The snapshot file will have two more columns,
   <b>StatusName</b> and <b>StatusValue</b>, if <a href=
   "#status">status</a> is implemented, also unlike a BURT snapshot.

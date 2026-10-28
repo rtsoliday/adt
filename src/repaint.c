@@ -599,7 +599,7 @@ void repaintlogo(Widget w, XtPointer clientdata, XtPointer calldata)
     xstart=(wwidth-width)/2;
     XDrawString(display,win,gc,xstart,ystart-linespacing,string,len);
 
-    sprintf(string,"Written by Dwarfs in the Waterfall Glenn");
+    sprintf(string,"Written by Dwarfs in the Waterfall Glen");
     len=(int)strlen(string);
     width=XTextWidth(fontinfo,string,len);
     xstart=(wwidth-width)/2;
