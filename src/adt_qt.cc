@@ -106,6 +106,11 @@ static constexpr int NSAVE = 5;
 // can be checked. Bundled layouts use at most eight arrays and four areas.
 static constexpr int MAX_LAYOUT_ARRAYS = 1024;
 static constexpr int MAX_LAYOUT_AREAS = 1024;
+// Each PV opens Channel Access channels; the largest bundled layout has 2,640.
+static constexpr int MAX_LAYOUT_PVS = 100000;
+// Zoom plots draw one label per sector on every repaint. Bundled lattices
+// have at most 40 sectors.
+static constexpr int MAX_LATTICE_SECTORS = 1024;
 
 static bool markers = true, lines = true, bars = false, grid = true,
   autoclear = true, showmaxmin = true, fillmaxmin = true, statMode = false,
@@ -779,7 +784,7 @@ static bool readLatticeFile(const QString &filename, int &nsectOut,
     SDDS_GetParameterAsLong(&table, const_cast<char *>("Ring"), &ringVal);
     if (SDDS_GetParameterAsLong(&table, const_cast<char *>("Nsectors"), &ns) &&
         SDDS_GetParameterAsDouble(&table, const_cast<char *>("Stotal"), &st) &&
-        ns > 0 && std::isfinite(st) && st > 0.0) {
+        ns > 0 && ns <= MAX_LATTICE_SECTORS && std::isfinite(st) && st > 0.0) {
       nsectOut = static_cast<int>(ns);
       stotalOut = st;
       int rows = SDDS_CountRowsOfInterest(&table);
@@ -3806,6 +3811,7 @@ private:
     int narrays = 0;
     int nareas = 0;
     int pages = 0;
+    int totalRows = 0;
     int32_t templong = 0;
     QStringList missingS;  // PVs without a lattice s value, reported once
 
@@ -4010,7 +4016,12 @@ private:
         failLoad("PV arrays must contain a positive, representable row count");
         return;
       }
+      if (rowCount > MAX_LAYOUT_PVS - totalRows) {
+        failLoad(QString("PV file exceeds the limit of %1 PVs").arg(MAX_LAYOUT_PVS));
+        return;
+      }
       int rows = static_cast<int>(rowCount);
+      totalRows += rows;
       arr.nvals = rows;
       arr.names.clear();
       arr.vals.fill(0.0, rows);

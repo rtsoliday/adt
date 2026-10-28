@@ -104,7 +104,9 @@ PV directory. A relative `ADTReferenceFile` in a PV file is resolved against
 the snapshot directory.
 
 The Qt application rejects PV files that declare more than 1,024 arrays or
-1,024 display areas before allocating the layout.
+1,024 display areas before allocating the layout, and PV files with more than
+100,000 PVs in total. A lattice file with more than 1,024 sectors is ignored,
+as other invalid lattice files are.
 
 `pv/sr.bpm.short.pv` is an OrbitScreen file (`OSFileType`, with the
 `ORBITSCREENLATTICE` lattice `pv/sr.short.lat`), not an ADT PV file. Neither
