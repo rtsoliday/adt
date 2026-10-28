@@ -87,19 +87,24 @@ Loading a PV file replaces the startup logo with one or more display areas
 and, when the file asks for one, a zoom area at the bottom. The window title
 shows the name of the PV file.
 
+If a PV file cannot be read or fails validation, the current display, stored
+sets and reference remain in place.
+
 ### Read the display
 
 - Each array has a title row with its color, heading and units, followed by
   the population standard deviation (**SDEV**), average (**AVG**) and
   largest-magnitude value (**MAX**) of what is plotted, over the available
-  points that Check Status does not exclude. A statistic that cannot be
-  represented shows **n/a**.
+  points that Check Status does not exclude. A statistic with no valid sample
+  or one that cannot be represented shows **n/a**. Large and very small
+  statistics use scientific notation.
 - **Unavailable: n/N** appears when channels are disconnected or return no
   valid value, or when a server has not answered a read for more than twice
   the update interval (at least 5 s). A point without a value is drawn as a
   black square on the center line, with no line or bar to it.
 - Hold the left mouse button on a plot to see the nearest element and its
-  neighbors, with their PV names and values. Release the button to close the
+  neighbors, with their PV names and labeled plotted and live values.
+  Neighbors wrap only in ring lattices. Release the button to close the
   details, or move off the plot before releasing to keep them open.
 
 ADT only reads PVs. The **Write** menu writes snapshot files, never PVs.
@@ -144,7 +149,8 @@ The PV file sets the initial values with `ADTCenterVal` and
 - **Options > Reset Max/Min**, or a right click on a display area, restarts
   the Max/Min envelopes and the accumulated statistics.
 - **File > Status...** lists the files in use, the accumulated statistics and
-  history time, and the time and file of each stored set.
+  history time, and the time and file of each stored set. Statistics use the
+  display's units and number formatting, including scientific notation.
 )md"},
   {"Log Scale", R"md(
 A PV file page with a nonzero `ADTLogScale` plots its array in decades, as
@@ -153,8 +159,8 @@ scale interval are then in decades; for example `pv/sr.ionpump.pv` centers
 on -8, which is 1e-8 Torr.
 
 - A value at or below zero has no logarithm. It is drawn as unavailable, and
-  point details show **&le; 0 (log undefined)**. Point details show the
-  logarithm of the other values.
+  point details identify the logarithm as undefined. Point details label the
+  plotted value and the live scaled linear value separately.
 - In difference and reference modes the array shows the change in decades,
   log10(value) - log10(stored or reference value). A point where either value
   is not positive, or is unavailable, is drawn as unavailable.
@@ -219,14 +225,20 @@ current values minus the difference set, with the reference displayed the
 current values minus the reference, and otherwise the current values. Start
 ADT with `-d` to store set 1 shortly after startup and display differences
 from it.
+
+A label above the display identifies the plotted quantity, any stored-set
+overlay and accumulated statistics mode. The **Display** and **Difference**
+menus mark their active selections.
 )md"},
   {"Snapshots and Plots", R"md(
 - **File > Write > Current** writes the current values to a snapshot file.
   **File > Write > 1** to **5** writes a stored set.
 - **File > Plot > Current**, or a stored set number, plots the values with
-  the external `sddsplot` program, one panel per array. Plotting needs
-  `sddsplot` on your `PATH` and a Unix shell; ADT warns when either is
-  missing. The plot runs on its own and stays open after ADT exits. Errors
+  the external `sddsplot` program and Qt viewer `mpl_qt`, one panel per array.
+  Plotting needs both programs on your `PATH` and a Unix shell; ADT warns
+  when a required program is missing. The plot runs on its own and stays
+  open after ADT exits. Its temporary input remains available for zooming
+  and replotting until the viewer closes, then the files are removed. Errors
   from a running `sddsplot` go to its standard error, not to ADT.
 
 Snapshot files use the SDDS `ADTSNAP` format with `ControlName` and
@@ -245,8 +257,10 @@ still write 0 as the value of an unavailable point, so older ADT releases can
 read them; a file without the column is read as fully available. When a
 stored set or the reference is displayed or subtracted, a point that is
 unavailable in either one has no value and does not count in the
-statistics. Plot files leave out unavailable points, so `sddsplot` shows
-gaps.
+statistics. Unavailable counts describe the current plotted quantity,
+including missing reference or difference values. Plot files leave out
+unavailable points and identify separate segments so the external curve
+does not connect across gaps.
 )md"},
   {"PV Files", R"md(
 A PV file is an SDDS file with one page per array. Each page lists the
@@ -350,7 +364,7 @@ application differs in these ways:
   channels at each update and reports unavailable channels in the title rows
   and point details.
 - A nonpositive value of a log-scale array is drawn as unavailable, and
-  point details show **&le; 0 (log undefined)**, where the Motif version showed
+  point details identify the undefined logarithm, where the Motif version showed
   0. In difference and reference modes a log-scale array plots the change in
   decades.
 - Threshold PVs (`ThresholdName`) are not checked.

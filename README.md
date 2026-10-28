@@ -35,6 +35,20 @@ This uses existing dependency outputs without rebuilding sibling repositories.
 The application and `xintolat` outputs are placed under `$scratch`, which can
 be removed when no longer needed.
 
+On Unix, run the focused Qt display regressions with:
+
+```sh
+make -C src test-ui EPICS_BIN_DIR= EPICS_LIB_DIR= EPICS_INC_DIR=
+make -C src test-export EPICS_BIN_DIR= EPICS_LIB_DIR= EPICS_INC_DIR=
+```
+
+These checks use Qt's offscreen platform and an intentionally disconnected,
+loopback-only PV fixture. They require local socket access for Channel Access
+initialization and cover statistics, contrast, stored sets, rejected and valid
+layout changes, and plot-file lifetime. The export target additionally checks
+snapshot round trips with special headings and quoted PV paths, undefined and
+historical Max/Min envelopes, and long heading visibility.
+
 ## Starting ADT
 
 After building, the binary is placed in `bin/<OS>-<ARCH>/adt`. It accepts
@@ -103,6 +117,9 @@ relative to the current working directory, independently of the configured
 PV directory. A relative `ADTReferenceFile` in a PV file is resolved against
 the snapshot directory.
 
+If a PV file cannot be read or fails validation, ADT keeps the active layout,
+channel connections, stored sets and reference intact.
+
 The Qt application rejects PV files that declare more than 1,024 arrays or
 1,024 display areas before allocating the layout, and PV files with more than
 100,000 PVs in total. A lattice file with more than 1,024 sectors is ignored,
@@ -153,7 +170,8 @@ For the Qt application, account for these differences when using the manual:
   with `ADTAvailable` 0 unavailable; a file without the column is fully
   available, as before. Older ADT releases read these files and ignore the
   added column. Plot files leave out the rows of unavailable points; their
-  `Index` column keeps the true positions, so `sddsplot` shows gaps.
+  `Index` column keeps the true positions. A `Segment` column and ADT's plot
+  command keep lines from connecting across unavailable points.
 - When a PV file has a `StatusName` column, and `-x` is not given, ADT reads
   each status PV in the same update as its value, as the Motif version did.
   A status name of `-` is not checked. Status 0 means invalid data and status
@@ -171,7 +189,7 @@ For the Qt application, account for these differences when using the manual:
   values, a displayed stored set, and the max/min envelope. Its grid, center,
   and scale are in decades (`pv/sr.ionpump.pv` uses center -8, "log Torr").
   A nonpositive value has no logarithm: it is drawn as unavailable, and point
-  details show `≤ 0 (log undefined)`, where the Motif version showed 0. In
+  details identify the plotted logarithm as undefined. In
   difference and reference modes the array plots the change in decades,
   log10(value) - log10(stored or reference value); a point where either value
   is nonpositive or unavailable is drawn as unavailable. SDEV, AVG, and MAX
@@ -194,11 +212,21 @@ For the Qt application, account for these differences when using the manual:
   minus the difference set in difference mode, minus the reference when the
   reference is displayed, and otherwise the current values. SDEV is the
   population standard deviation, computed from the mean in a second pass;
-  only available points that Check Status does not exclude count. A statistic that cannot be represented shows
-  `n/a`, and accumulated statistics leave such updates out.
+  only available points that Check Status does not exclude count. A statistic
+  with no valid sample or one that cannot be represented shows `n/a`, and
+  accumulated statistics leave such updates out. Large and very small
+  statistics use scientific notation so the value remains readable.
+- A label above the display identifies current values, the active difference
+  set or reference, any stored-set overlay, and accumulated statistics mode.
+  The Display and Difference menus mark the active selection.
 - Qt supports the initial zoom sector/range options above, mouse-wheel
   zooming, and middle-click centering from display areas onto the zoom data.
-  Point details use significant digits, preserving small readings.
+  Point details use significant digits and label both the plotted value and
+  the live scaled linear value. Selection uses each array's own coordinates;
+  neighbors wrap only for ring lattices. Unavailable counts describe the
+  current plotted quantity, including unavailable reference/difference values
+  and undefined logarithms. The Status window uses the same units and number
+  formatting as the display, and SDEV uses the absolute scale factor.
 - Snapshot and plot exports preserve double precision. Failed or incomplete snapshot/reference reads leave the prior set intact.
   Snapshot/reference inputs require one complete page per array, in the order
   of the loaded PV file. Pages after the last array are not read, so a
@@ -208,12 +236,14 @@ For the Qt application, account for these differences when using the manual:
   Snapshot reads reject nonnumeric and nonfinite values. Snapshot reads and
   writes use the existing SDDS `ADTSNAP`/`ValueString` format, and references
   use the same snapshot format. Snapshot and plot exports escape control names
-  using SDDS string rules. Plot requires the external `sddsplot`
-  program and a Unix shell. ADT looks for `sddsplot` on the `PATH` before it
-  writes the temporary plot file, and warns when it is missing or when
+  using SDDS string rules. Plot requires the external `sddsplot` and `mpl_qt`
+  programs and a Unix shell. ADT looks for both programs on the `PATH` before it
+  writes the temporary plot files, and warns when either is missing or when
   `/bin/sh` cannot be started; the file name reaches the shell as an argument,
-  not as command text. The plot runs detached, survives ADT, and removes the
-  file when it closes. Errors from a running `sddsplot` go to its own
+  not as command text. ADT renders with the Qt device and opens `mpl_qt` directly.
+  The plot runs detached, survives ADT, and keeps its input available for
+  zooming and replotting until the viewer closes, then removes both temporary
+  files. Errors from a running `sddsplot` go to its own
   standard error, not to ADT.
 
 Use the current menus and `adt -h` output together with this README for Qt

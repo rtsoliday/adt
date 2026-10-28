@@ -97,3 +97,25 @@ $(OBJ_DIR)/xintolat$(EXEEXT): $(xintolat_OBJS) $(PROD_DEPS)
 	@if [ -n "$(EPICS_BIN_DIR)" ]; then echo cp -f $@ $(EPICS_BIN_DIR)/; fi
 	@if [ -n "$(EPICS_BIN_DIR)" ]; then cp -f $@ $(EPICS_BIN_DIR)/; fi
 
+ifndef MOTIF
+.PHONY: test-export
+test-export: $(OBJ_DIR)/adt_export_regressions$(EXEEXT)
+	QT_QPA_PLATFORM=offscreen $< ../tests/ui-regression.pv
+
+$(OBJ_DIR)/adt_export_regressions.o: ../tests/qt_export_regressions.cc adt_qt.cc adt_help.h adtVersion.h | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/adt_export_regressions$(EXEEXT): $(OBJ_DIR)/adt_export_regressions.o $(OBJ_DIR)/adt_help.o $(PROD_DEPS)
+	$(LINKEXE) $(OUTPUTEXE) $(OBJ_DIR)/adt_export_regressions.o $(OBJ_DIR)/adt_help.o $(LDFLAGS) $(LIB_LINK_DIRS) $(PROD_LIBS) $(PROD_LIBS_SDDS) $(PROD_SYS_LIBS)
+
+.PHONY: test-ui
+test-ui: $(OBJ_DIR)/adt_ui_regressions$(EXEEXT)
+	QT_QPA_PLATFORM=offscreen $< ../tests/ui-regression.pv
+
+$(OBJ_DIR)/adt_ui_regressions.o: ../tests/qt_ui_regressions.cc adt_qt.cc adt_help.h adtVersion.h | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/adt_ui_regressions$(EXEEXT): $(OBJ_DIR)/adt_ui_regressions.o $(OBJ_DIR)/adt_help.o $(PROD_DEPS)
+	$(LINKEXE) $(OUTPUTEXE) $(OBJ_DIR)/adt_ui_regressions.o $(OBJ_DIR)/adt_help.o $(LDFLAGS) $(LIB_LINK_DIRS) $(PROD_LIBS) $(PROD_LIBS_SDDS) $(PROD_SYS_LIBS)
+endif
+
