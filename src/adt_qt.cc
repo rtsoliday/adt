@@ -791,14 +791,17 @@ static bool readLatticeFile(const QString &filename, int &nsectOut,
     SDDS_Terminate(&table);
     return false;
   }
+  // Accept what legacy ADT accepted: production lattices have negative S
+  // (sr.lat), S that steps back (bts.lat, btx.lat) and a double SymbolHeight
+  // column (lea.lat). Numeric columns are read in any numeric type.
   if (SDDS_CheckColumn(&table, const_cast<char *>("Name"), NULL,
       SDDS_STRING, NULL) != SDDS_CHECK_OKAY ||
       SDDS_CheckColumn(&table, const_cast<char *>("S"), NULL,
-      SDDS_DOUBLE, NULL) != SDDS_CHECK_OKAY ||
+      SDDS_ANY_NUMERIC_TYPE, NULL) != SDDS_CHECK_OKAY ||
       SDDS_CheckColumn(&table, const_cast<char *>("Length"), NULL,
-      SDDS_DOUBLE, NULL) != SDDS_CHECK_OKAY ||
+      SDDS_ANY_NUMERIC_TYPE, NULL) != SDDS_CHECK_OKAY ||
       SDDS_CheckColumn(&table, const_cast<char *>("SymbolHeight"), NULL,
-      SDDS_SHORT, NULL) != SDDS_CHECK_OKAY) {
+      SDDS_ANY_NUMERIC_TYPE, NULL) != SDDS_CHECK_OKAY) {
     SDDS_Terminate(&table);
     return false;
   }
@@ -806,30 +809,31 @@ static bool readLatticeFile(const QString &filename, int &nsectOut,
   char *type = NULL;
   type = readStringParameter(&table, "ADTFileType");
   if (type && !strcmp(type, "ADTLATTICE")) {
-    int32_t ns;
+    int32_t ns = 1;  // legacy default when Nsectors is absent
     double st;
     int32_t ringVal = 1;
     SDDS_GetParameterAsLong(&table, const_cast<char *>("Ring"), &ringVal);
-    if (SDDS_GetParameterAsLong(&table, const_cast<char *>("Nsectors"), &ns) &&
+    bool nsOk = SDDS_GetParameterIndex(&table, const_cast<char *>("Nsectors")) < 0 ||
+      SDDS_GetParameterAsLong(&table, const_cast<char *>("Nsectors"), &ns);
+    int rows = SDDS_CountRowsOfInterest(&table);
+    if (nsOk && rows > 0 &&
         SDDS_GetParameterAsDouble(&table, const_cast<char *>("Stotal"), &st) &&
         ns > 0 && ns <= MAX_LATTICE_SECTORS && std::isfinite(st) && st > 0.0) {
       nsectOut = static_cast<int>(ns);
       stotalOut = st;
-      int rows = SDDS_CountRowsOfInterest(&table);
       char **names = (char **)SDDS_GetColumn(&table,
         const_cast<char *>("Name"));
-      double *scol = (double *)SDDS_GetColumn(&table,
+      double *scol = SDDS_GetColumnInDoubles(&table,
         const_cast<char *>("S"));
-      double *len = (double *)SDDS_GetColumn(&table,
+      double *len = SDDS_GetColumnInDoubles(&table,
         const_cast<char *>("Length"));
-      short *height = (short *)SDDS_GetColumn(&table,
+      double *height = SDDS_GetColumnInDoubles(&table,
         const_cast<char *>("SymbolHeight"));
       if (names && scol && len && height) {
         bool valid = true;
         for (int i = 0; i < rows; ++i) {
           if (!std::isfinite(scol[i]) || !std::isfinite(len[i]) ||
-              scol[i] < 0.0 || scol[i] > st || len[i] < 0.0 ||
-              (i > 0 && scol[i] < scol[i - 1])) {
+              !std::isfinite(height[i])) {
             valid = false;
             break;
           }
@@ -839,7 +843,8 @@ static bool readLatticeFile(const QString &filename, int &nsectOut,
             latNames.append(names[i]);
             latS.append(scol[i]);
             latLen.append(len[i]);
-            latHeight.append(height[i]);
+            latHeight.append(static_cast<short>(std::max(-32768.0,
+              std::min(32767.0, height[i]))));
           }
           latRing = ringVal != 0;
           ok = true;
@@ -4213,9 +4218,19 @@ private:
 
       }
 
-      if (iarray != -1 || first || pages != narrays) {
+      if (first) {
+        failLoad("PV file contains no arrays");
+        return false;
+      }
+      if (iarray != -1 || pages > narrays) {
         failLoad("PV file is malformed, truncated, or does not match ADTNArrays");
         return false;
+      }
+      // ADTFilter can drop whole pages without lowering ADTNArrays, as
+      // installed ADT accepted. Show the arrays that are present.
+      if (pages < narrays) {
+        arrays.resize(pages);
+        candidate.statusNames.resize(pages);
       }
       if (!SDDS_Terminate(&table)) {
         QMessageBox::warning(this, "ADT", "Unable to finish reading PV file:\n" + file);
