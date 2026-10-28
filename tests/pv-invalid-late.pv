@@ -1,0 +1,11 @@
+SDDS1
+&parameter name=ADTFileType type=string fixed_value="ADTPV" &end
+&parameter name=ADTNArrays type=short fixed_value=2 &end
+&parameter name=ADTNAreas type=short fixed_value=2 &end
+&column name=ControlName type=string &end
+&column name=ControlType type=string &end
+&column name=ControlMode type=string &end
+&data mode=ascii &end
+1
+ADT:UI:REGRESSION:UNAVAILABLE pv RO
+0
