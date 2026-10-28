@@ -103,6 +103,9 @@ relative to the current working directory, independently of the configured
 PV directory. A relative `ADTReferenceFile` in a PV file is resolved against
 the snapshot directory.
 
+The Qt application rejects PV files that declare more than 1,024 arrays or
+1,024 display areas before allocating the layout.
+
 `pv/sr.bpm.short.pv` is an OrbitScreen file (`OSFileType`, with the
 `ORBITSCREENLATTICE` lattice `pv/sr.short.lat`), not an ADT PV file. Neither
 the Qt nor the Motif ADT can load it, and it is not in the example

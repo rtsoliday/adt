@@ -102,6 +102,10 @@ static const char *defaultColors[] = {
 };
 static constexpr int NCOLORS = sizeof(defaultColors) / sizeof(defaultColors[0]);
 static constexpr int NSAVE = 5;
+// Keep a malformed PV file from requesting enormous vectors before its pages
+// can be checked. Bundled layouts use at most eight arrays and four areas.
+static constexpr int MAX_LAYOUT_ARRAYS = 1024;
+static constexpr int MAX_LAYOUT_AREAS = 1024;
 
 static bool markers = true, lines = true, bars = false, grid = true,
   autoclear = true, showmaxmin = true, fillmaxmin = true, statMode = false,
@@ -3831,6 +3835,11 @@ private:
         nareas = templong;
         if (narrays <= 0 || nareas <= 0) {
           failLoad("ADTNArrays and ADTNAreas must be positive");
+          return;
+        }
+        if (narrays > MAX_LAYOUT_ARRAYS || nareas > MAX_LAYOUT_AREAS) {
+          failLoad(QString("PV file exceeds the limit of %1 arrays or %2 areas")
+            .arg(MAX_LAYOUT_ARRAYS).arg(MAX_LAYOUT_AREAS));
           return;
         }
         arrays.resize(narrays);
