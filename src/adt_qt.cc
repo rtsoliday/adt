@@ -2249,6 +2249,22 @@ public:
       centerSectSpin->setValue(centerSect);
   }
 
+protected:
+  /** @brief Reserve enough height for headings at the current display width. */
+  bool event(QEvent *event) override
+  {
+    bool handled = QWidget::event(event);
+    if (layout() && (event->type() == QEvent::Resize ||
+        event->type() == QEvent::LayoutRequest)) {
+      int height = layout()->totalHeightForWidth(width());
+      if (height >= 0) {
+        setMinimumHeight(height);
+        layout()->setGeometry(rect());
+      }
+    }
+    return handled;
+  }
+
 private:
   /**
    * @brief Queue a plot redraw on the next event loop cycle.

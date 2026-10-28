@@ -186,18 +186,21 @@ int main(int argc, char **argv)
     AreaWidget labels(&area, {&array});
     labels.resize(800, 300);
     labels.show();
-    app.processEvents();
-    bool found = false;
-    for (QLabel *label : labels.findChildren<QLabel *>()) {
-      if (label->text().startsWith("Beam position")) {
-        found = true;
-        require(label->wordWrap() && label->toolTip().endsWith("(mm)"),
-          "Full heading and units must be accessible");
-        require(label->height() >= label->heightForWidth(label->width()),
-          "Wrapped heading is vertically clipped");
+    for (int width : {800, 1200, 800}) {
+      labels.resize(width, 300);
+      app.processEvents();
+      bool found = false;
+      for (QLabel *label : labels.findChildren<QLabel *>()) {
+        if (label->text().startsWith("Beam position")) {
+          found = true;
+          require(label->wordWrap() && label->toolTip().endsWith("(mm)"),
+            "Full heading and units must be accessible");
+          require(label->height() >= label->heightForWidth(label->width()),
+            "Wrapped heading is vertically clipped");
+        }
       }
+      require(found, "Heading label not found");
     }
-    require(found, "Heading label not found");
 
     array.scaleFactor = -2;
     array.sdev = std::sqrt(1.25);
