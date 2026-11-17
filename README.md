@@ -5,6 +5,21 @@ invoke `MOTIF=1 make`. Both builds use the executable name `adt`; there is
 no separate `qtadt` executable. Version information is available from
 **Help > About ADT**.
 
+## Documentation website
+
+Build the ADT (Qt) website and downloadable manuals with `make docs`.
+The build requires Python 3.9 or newer, Node.js 22 or newer, and npm.
+The validated output is `docs/html/`. Preview it with:
+
+```sh
+python3 -m http.server 8000 --bind 127.0.0.1 --directory docs/html
+```
+
+Open `http://127.0.0.1:8000/`. To prepare the site for the APS manuals
+directory, use `make docs DOCS_BASE=/manuals/QtADT/`.
+The [documentation workflow](docs/site/develop/documentation.md) describes
+the imported sources, downloads, preview server, and cleanup targets.
+
 ## Building
 
 The build requires GNU Make, a C++17 compiler, SDDS headers and libraries,

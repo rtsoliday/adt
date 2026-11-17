@@ -1,0 +1,24 @@
+node_modules/
+dist/
+.vitepress/cache/
+
+# Generated from README.md, src/adt_help.cc, src/adtVersion.h, and LICENSE.
+/_includes/version.md
+/public/downloads/
+/get-started/install.md
+/get-started/first-display.md
+/operate/display-areas.md
+/operate/log-scale.md
+/operate/zoom-area.md
+/operate/status.md
+/operate/stored-sets.md
+/operate/snapshots-plots.md
+/reference/pv-files.md
+/reference/configuration.md
+/reference/command-line.md
+/reference/keyboard-shortcuts.md
+/reference/startup.md
+/reference/configuration-details.md
+/understand/legacy-differences.md
+/understand/qt-behavior.md
+/project/license.md

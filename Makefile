@@ -1,4 +1,7 @@
 .DEFAULT_GOAL := all
+DOCS_GOALS := docs docs-clean docs-distclean
+
+ifneq ($(filter-out $(DOCS_GOALS),$(or $(MAKECMDGOALS),all)),)
 # Detect OS and Architecture
 OS := $(shell uname -s)
 ifeq ($(findstring CYGWIN, $(OS)),CYGWIN)
@@ -86,3 +89,14 @@ clean:
 distclean: clean
 	rm -rf bin/$(OS)-$(ARCH)
 	rm -rf lib/$(OS)-$(ARCH)
+endif
+
+DOCS_BASE ?= /
+docs docs-clean docs-distclean: PYTHON = $(if $(filter Windows Windows_NT,$(OS)),python,python3)
+.PHONY: docs docs-clean docs-distclean
+docs:
+	$(PYTHON) scripts/build-docs.py --base "$(DOCS_BASE)"
+docs-clean:
+	$(PYTHON) scripts/sync-docs.py --clean
+docs-distclean:
+	$(PYTHON) scripts/sync-docs.py --distclean

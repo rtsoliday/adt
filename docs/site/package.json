@@ -1,0 +1,17 @@
+{
+  "name": "adt-qt-documentation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev . --host 127.0.0.1",
+    "build": "node ../../scripts/render-manual.mjs && vitepress build .",
+    "preview": "vitepress preview . --host 127.0.0.1"
+  },
+  "devDependencies": {
+    "markdown-it": "14.1.0",
+    "vitepress": "1.6.4"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
