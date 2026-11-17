@@ -7,6 +7,8 @@ description: Open an ADT display, compare arrays, configure PV files, and export
 
 <!--@include: ./_includes/version.md-->
 
+See the [release notes](./project/release-notes) for changes in this version.
+
 Display EPICS process-variable arrays in machine order, compare live values
 with stored sets or a reference, and inspect individual readings.
 

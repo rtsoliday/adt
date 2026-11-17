@@ -38,19 +38,13 @@ endif
 #-D_GNU_SOURCE -D_DEFAULT_SOURCE
 #-DACCESS_SECURITY -D_NO_PROTO
 
+EPICS_STATIC_LIBS = $(patsubst %,$(EPICS_BASE_LIB_DIR)/lib%.a,pvaClient nt pvAccessCA pvAccess pvData ca Com)
+
 ifeq ($(OS), Linux)
   CFLAGS += -I$(EPICS_BASE)/include/compiler/gcc -I$(EPICS_BASE)/include/os/$(OS)
   CXXFLAGS += -I$(EPICS_BASE)/include/compiler/gcc -I$(EPICS_BASE)/include/os/$(OS)
-  LDFLAGS := -L$(SDDS_REPO)/lib/$(OS)-$(ARCH) -L$(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH) -fopenmp $(LDFLAGS)
-  PROD_SYS_LIBS := $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libpvaClient.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libnt.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libpvAccessCA.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libpvAccess.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libpvData.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libca.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libCom.a \
-    $(LZMA_LIB) $(GSL_LIB) $(GSLCBLAS_LIB) \
-    $(Z_LIB) -lreadline $(PROD_SYS_LIBS)
+  LDFLAGS := -L$(SDDS_REPO)/lib/$(OS)-$(ARCH) -L$(EPICS_BASE_LIB_DIR) -fopenmp $(LDFLAGS)
+  PROD_SYS_LIBS := $(EPICS_STATIC_LIBS) $(LZMA_LIB) $(GSL_LIB) $(GSLCBLAS_LIB) $(Z_LIB) $(PROD_SYS_LIBS)
   ifdef MOTIF
     PROD_SYS_LIBS += $(XM_LIB) $(XMU_LIB) $(XT_LIB) $(X11_LIB)
   endif
@@ -60,15 +54,8 @@ endif
 ifeq ($(OS), Darwin)
   CFLAGS += -I$(EPICS_BASE)/include/compiler/clang -I$(EPICS_BASE)/include/os/$(OS) -Wno-overloaded-virtual -Wno-deprecated-builtins
   CXXFLAGS += -I$(EPICS_BASE)/include/compiler/clang -I$(EPICS_BASE)/include/os/$(OS) -Wno-overloaded-virtual -Wno-deprecated-builtins
-  LDFLAGS := -L$(SDDS_REPO)/lib/$(OS)-$(ARCH) -L$(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH) $(LDFLAGS)
-  PROD_SYS_LIBS := $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libpvaClient.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libnt.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libpvAccessCA.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libpvAccess.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libpvData.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libca.a \
-    $(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)/libCom.a \
-    $(LZMA_LIB) $(GSL_LIB) $(GSLCBLAS_LIB) $(Z_LIB) $(PROD_SYS_LIBS)
+  LDFLAGS := -L$(SDDS_REPO)/lib/$(OS)-$(ARCH) -L$(EPICS_BASE_LIB_DIR) $(LDFLAGS)
+  PROD_SYS_LIBS := $(EPICS_STATIC_LIBS) $(LZMA_LIB) $(GSL_LIB) $(GSLCBLAS_LIB) $(Z_LIB) $(PROD_SYS_LIBS)
   PROD_LIBS_SDDS = -lmdbcommon -lmatlib -lSDDS1 -lnamelist -lrpnlib -lmdbmth -lmdblib
 endif
 
@@ -81,12 +68,13 @@ ifeq ($(OS), Windows)
   LIB_LINK_DIRS += -LIBPATH:$(SDDS_REPO)/lib/$(OS)-$(ARCH) -LIBPATH:$(EPICS_BASE)/lib/$(EPICS_HOST)-$(EPICS_ARCH)
 endif
 
+adt_LIBS = $(PROD_LIBS) $(PROD_LIBS_SDDS) $(PROD_SYS_LIBS) $(EPICS_READLINE_LIBS)
 CUSTOM_LINK_PRODUCTS += adt xintolat
 BUILD_GENERATED += $(patsubst %.nl,$(OBJ_DIR)/%.h,$(wildcard *.nl))
 include ../Makefile.build
 $(BUILD_GENERATED): | $(OBJ_DIR)
 $(OBJ_DIR)/adt$(EXEEXT): $(adt_OBJS) $(PROD_DEPS)
-	$(LINKEXE) $(OUTPUTEXE) $(adt_OBJS) $(LDFLAGS) $(LIB_LINK_DIRS) $(PROD_LIBS) $(PROD_LIBS_SDDS) $(PROD_SYS_LIBS)
+	$(LINKEXE) $(OUTPUTEXE) $(adt_OBJS) $(LDFLAGS) $(LIB_LINK_DIRS) $(adt_LIBS)
 	cp -f $@ $(BIN_DIR)/
 	@if [ -n "$(EPICS_BIN_DIR)" ]; then echo cp -f $@ $(EPICS_BIN_DIR)/; fi
 	@if [ -n "$(EPICS_BIN_DIR)" ]; then cp -f $@ $(EPICS_BIN_DIR)/; fi
@@ -106,7 +94,7 @@ $(OBJ_DIR)/adt_export_regressions.o: ../tests/qt_export_regressions.cc adt_qt.cc
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/adt_export_regressions$(EXEEXT): $(OBJ_DIR)/adt_export_regressions.o $(OBJ_DIR)/adt_help.o $(PROD_DEPS)
-	$(LINKEXE) $(OUTPUTEXE) $(OBJ_DIR)/adt_export_regressions.o $(OBJ_DIR)/adt_help.o $(LDFLAGS) $(LIB_LINK_DIRS) $(PROD_LIBS) $(PROD_LIBS_SDDS) $(PROD_SYS_LIBS)
+	$(LINKEXE) $(OUTPUTEXE) $(OBJ_DIR)/adt_export_regressions.o $(OBJ_DIR)/adt_help.o $(LDFLAGS) $(LIB_LINK_DIRS) $(adt_LIBS)
 
 .PHONY: test-ui
 test-ui: $(OBJ_DIR)/adt_ui_regressions$(EXEEXT)
@@ -116,6 +104,6 @@ $(OBJ_DIR)/adt_ui_regressions.o: ../tests/qt_ui_regressions.cc adt_qt.cc adt_hel
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/adt_ui_regressions$(EXEEXT): $(OBJ_DIR)/adt_ui_regressions.o $(OBJ_DIR)/adt_help.o $(PROD_DEPS)
-	$(LINKEXE) $(OUTPUTEXE) $(OBJ_DIR)/adt_ui_regressions.o $(OBJ_DIR)/adt_help.o $(LDFLAGS) $(LIB_LINK_DIRS) $(PROD_LIBS) $(PROD_LIBS_SDDS) $(PROD_SYS_LIBS)
+	$(LINKEXE) $(OUTPUTEXE) $(OBJ_DIR)/adt_ui_regressions.o $(OBJ_DIR)/adt_help.o $(LDFLAGS) $(LIB_LINK_DIRS) $(adt_LIBS)
 endif
 

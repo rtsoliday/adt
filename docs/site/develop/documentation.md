@@ -30,7 +30,7 @@ imported source.
 | Build, startup, configuration, and detailed Qt behavior | `README.md` |
 | Application version | `src/adtVersion.h` |
 | License | `LICENSE` |
-| Homepage, downloads, authors, and this workflow | Authored Markdown under `docs/site/` |
+| Homepage, release notes, downloads, authors, and this workflow | Authored Markdown under `docs/site/` |
 | Navigation and shared presentation | `docs/site/.vitepress/` |
 
 `scripts/sync-docs.py` extracts the C++ raw Markdown literals and rewrites

@@ -5,6 +5,9 @@ invoke `MOTIF=1 make`. Both builds use the executable name `adt`; there is
 no separate `qtadt` executable. Version information is available from
 **Help > About ADT**.
 
+The current release is **2.1.1.0**. See the
+[release notes](docs/site/project/release-notes.md) for changes since 2.1.0.0.
+
 ## Documentation website
 
 Build the ADT (Qt) website and downloadable manuals with `make docs`.
@@ -27,9 +30,10 @@ EPICS Base headers and libraries, and Qt development files. The Unix recipe
 currently uses `pkg-config Qt5Widgets`. The Windows recipe currently names
 Qt 6.8.2 at
 `C:\Qt\6.8.2\msvc2022_64`. The link also needs the libraries selected by
-the Makefiles, including GSL, zlib, LZMA, and, on Linux, readline and
-OpenMP. Keep the sibling `SDDS` checkout available, or explicitly set
-`SDDS_REPO`; set `EPICS_BASE` to select a particular EPICS Base installation.
+the Makefiles, including GSL, zlib, LZMA, and OpenMP on Linux. On Linux and
+macOS, `adt` links Readline when the selected EPICS Base `libCom.a` uses it.
+Keep the sibling `SDDS` checkout available, or explicitly set `SDDS_REPO`.
+Set `EPICS_BASE` to select a particular EPICS Base installation.
 
 Top-level `make` rebuilds dependencies in the sibling SDDS checkout.
 The link and install rules copy executables into `BIN_DIR` and, when set,

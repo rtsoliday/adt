@@ -43,6 +43,7 @@ export default defineConfig({
         { text: 'Download the manuals', link: '/reference/manuals' }
       ]},
       { text: 'PROJECT & DEVELOPMENT', collapsed: true, items: [
+        { text: 'Release notes', link: '/project/release-notes' },
         { text: 'Differences from Motif', link: '/understand/legacy-differences' },
         { text: 'Qt behavior in detail', link: '/understand/qt-behavior' },
         { text: 'Maintain these docs', link: '/develop/documentation' },

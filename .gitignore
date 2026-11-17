@@ -1,0 +1,9 @@
+# Native build outputs.
+/bin/
+/lib/
+/src/O.*/
+
+# Local session output, personal launcher, and historical release audit.
+/.loglogin
+/ADTFilter
+/RELEASE_AUDIT_REPORT.md
